@@ -1,0 +1,67 @@
+name: Build & Release
+
+# Produit des exécutables autonomes (self-contained : aucun .NET à installer sur la cible).
+# - À chaque push sur main : compile les 4 plateformes et publie les ZIP en artefacts
+#   téléchargeables depuis la page du run (onglet Actions).
+# - À chaque tag vX.Y.Z : crée en plus une Release GitHub avec les ZIP attachés.
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [ win-x64, linux-x64, osx-x64, osx-arm64 ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publier le serveur
+        run: >
+          dotnet publish src/Remina.Server -c Release -r ${{ matrix.rid }}
+          --self-contained true -p:PublishSingleFile=true -o out/server
+
+      - name: Publier l'agent
+        run: >
+          dotnet publish src/Remina.Agent -c Release -r ${{ matrix.rid }}
+          --self-contained true -p:PublishSingleFile=true -o out/agent
+
+      - name: Empaqueter
+        run: |
+          mkdir -p dist
+          cp README.md out/server/ || true
+          cp README.md out/agent/ || true
+          (cd out/server && zip -rq ../../dist/Remina-Server-${{ matrix.rid }}.zip .)
+          (cd out/agent  && zip -rq ../../dist/Remina-Agent-${{ matrix.rid }}.zip .)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Remina-${{ matrix.rid }}
+          path: dist/*.zip
+
+  release:
+    name: Publier la Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true

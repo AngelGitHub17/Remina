@@ -1,0 +1,122 @@
+# Remina
+
+Logiciel de gestion de parc de postes, client/serveur, multiplateforme (façon GLPI),
+pensé pour NounoursCorp.
+
+**Version : `0.0.1-20261114-Remina`**
+Convention : toutes les versions `0.x.x` portent le nom de code **Remina**. Le nom ne
+change qu'au passage à `1.0.0`, puis `2.0.0`, etc.
+
+## Ce que fait la v0.0.1
+
+Première version lançable. Elle pose le socle sur lequel tout le reste se greffe :
+
+- **Serveur** ASP.NET Core 8 + EF Core (SQLite par défaut, PostgreSQL en un changement
+  de chaîne de connexion). Déployable en conteneur sur Proxmox ou n'importe quelle machine.
+- **Inscription des postes façon GLPI** : l'admin génère un code d'inscription, l'agent
+  le présente, reçoit une identité et un jeton d'agent (stocké haché côté serveur).
+- **Agent multiplateforme** (Windows / macOS / Linux) : inventaire de base, boucle de
+  heartbeat, récupération d'ordres (verrouiller, redémarrer, message, ticket, auto-login).
+- **Détection de session RDP** (Windows) : tant qu'une session distante est active,
+  l'agent suspend la connexion automatique de session.
+- **Console d'administration** via API (clé admin) : création de codes, liste des postes
+  avec état en ligne, mise en file de commandes.
+
+> Le suivi détaillé d'activité des applications n'est pas encore branché : il sera ajouté
+> composant par composant, avec information des utilisateurs et mode privé (voir RGPD).
+
+## Structure
+
+```
+Remina.sln
+src/
+  Remina.Shared/   DTO et contrats partagés agent <-> serveur, versionnage
+  Remina.Server/   API ASP.NET Core : inscription, heartbeat, admin
+  Remina.Agent/    Service multiplateforme : inscription + heartbeat + plateformes
+```
+
+## Télécharger une version prête à lancer
+
+Des exécutables **autonomes** (aucun .NET à installer sur la machine cible) sont produits
+automatiquement par GitHub Actions :
+
+- **Builds à jour** : onglet *Actions* → dernier run *Build & Release* → section *Artifacts*.
+  ZIP par plateforme : `Remina-Server-*` et `Remina-Agent-*` (`win-x64`, `linux-x64`,
+  `osx-x64`, `osx-arm64`).
+- **Versions publiées** : pousser un tag `vX.Y.Z` crée une *Release* avec les ZIP attachés.
+
+```bash
+git tag v0.0.1 && git push origin v0.0.1   # déclenche la Release 0.0.1
+```
+
+Lancer après décompression :
+
+```bash
+# Linux / macOS
+./Remina.Server        # serveur
+./Remina.Agent         # agent
+
+# Windows
+Remina.Server.exe
+Remina.Agent.exe
+```
+
+## Démarrer le serveur (depuis les sources)
+
+```bash
+cd src/Remina.Server
+# définir une vraie clé admin
+export Admin__ApiKey="ma-cle-admin"
+dotnet run --urls "http://0.0.0.0:5080"
+```
+
+Vérifier : `curl http://localhost:5080/` renvoie le nom et la version.
+
+## Inscrire un poste
+
+1. Créer un code d'inscription :
+
+```bash
+curl -X POST http://localhost:5080/api/admin/enrollment-codes \
+  -H "X-Admin-Key: ma-cle-admin" -H "Content-Type: application/json" \
+  -d '{"label":"Bureau","maxUses":5,"expiresInHours":24}'
+```
+
+2. Lancer l'agent avec ce code :
+
+```bash
+cd src/Remina.Agent
+export Remina__ServerUrl="http://IP_DU_SERVEUR:5080"
+export Remina__EnrollmentCode="LE-CODE-RENVOYE"
+dotnet run
+```
+
+L'agent s'inscrit une fois, enregistre son identité dans `remina-agent.json`, puis envoie
+un heartbeat toutes les 30 s. Le poste apparaît dans `GET /api/admin/machines`.
+
+## Endpoints
+
+| Méthode | Route | Auth | Rôle |
+|---|---|---|---|
+| GET | `/` `/health` | — | Version, état |
+| POST | `/api/agent/enroll` | code | Inscription d'un poste |
+| POST | `/api/agent/heartbeat` | jeton agent | État + récupération d'ordres |
+| POST | `/api/admin/enrollment-codes` | clé admin | Créer un code d'inscription |
+| GET | `/api/admin/machines` | clé admin | Lister les postes |
+| POST | `/api/admin/machines/{id}/commands` | clé admin | Mettre un ordre en file |
+
+Types d'ordres : `1` verrouiller, `2` redémarrer, `3` message, `4` ticket récapitulatif,
+`5` connexion automatique.
+
+## Pile par plateforme (agent)
+
+- **Windows** : identifiant via `MachineGuid`, RDP via `SM_REMOTESESSION`, inactivité via
+  `GetLastInputInfo`.
+- **Linux** : identifiant via `/etc/machine-id`. Inactivité sous Wayland à venir (extension bureau).
+- **macOS** : identifiant via `IOPlatformUUID`. Suivi détaillé soumis à l'autorisation d'accessibilité.
+
+## Suite prévue
+
+Suivi d'activité (transparent, avec mode privé) → ticket récapitulatif A4 (impression auto
+après 5 min sans réponse) → connexion automatique de session → temps réel SignalR →
+console web + NounoursAccount.
