@@ -29,13 +29,12 @@ public class AgentWorker : BackgroundService
     {
         _log.LogInformation("Agent Remina {Version} — OS {Os}", ReminaVersion.Full, _platform.Os);
 
-        if (!_state.IsEnrolled)
+        // Inscription : on réessaie jusqu'à réussir (serveur momentanément injoignable, etc.).
+        while (!_state.IsEnrolled && !ct.IsCancellationRequested)
         {
-            if (!await TryEnrollAsync(ct))
-            {
-                _log.LogWarning("Inscription impossible. Vérifie le code d'inscription et l'URL du serveur.");
-                return;
-            }
+            if (await TryEnrollAsync(ct)) break;
+            _log.LogWarning("Inscription impossible (code ou serveur). Nouvelle tentative dans 30 s.");
+            await Task.Delay(TimeSpan.FromSeconds(30), ct);
         }
 
         var idleThreshold = TimeSpan.FromMinutes(
@@ -114,7 +113,16 @@ public class AgentWorker : BackgroundService
             MachineName = resp.MachineName,
             HardwareId = hwId,
         };
-        _state.Save();
+        try
+        {
+            _state.Save();
+        }
+        catch (Exception ex)
+        {
+            // L'inscription a réussi côté serveur ; un échec d'écriture ne doit pas tout arrêter.
+            // La session continue ; au prochain démarrage, le serveur réutilise le poste (même HardwareId).
+            _log.LogWarning(ex, "Inscription OK mais impossible d'enregistrer l'état local.");
+        }
         _log.LogInformation("Poste inscrit : {Name} ({Id})", resp.MachineName, resp.MachineId);
         return true;
     }

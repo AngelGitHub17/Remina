@@ -51,7 +51,7 @@ public abstract class PlatformBase : IPlatform
     /// <summary>Repli commun : GUID persisté localement si l'OS n'expose pas d'ID stable.</summary>
     protected static string StableGuidFallback()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "hardware-id");
+        var path = Path.Combine(ReminaPaths.DataDir, "hardware-id");
         if (File.Exists(path)) return File.ReadAllText(path).Trim();
         var id = Guid.NewGuid().ToString("N");
         File.WriteAllText(path, id);

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Remina.Shared;
 
 namespace Remina.Agent;
 
@@ -14,7 +15,7 @@ public class AgentState
     public string HardwareId { get; set; } = "";
 
     private static string StatePath =>
-        Path.Combine(AppContext.BaseDirectory, "remina-agent.json");
+        Path.Combine(ReminaPaths.DataDir, "remina-agent.json");
 
     public static AgentState? Load()
     {
