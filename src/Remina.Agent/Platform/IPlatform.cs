@@ -27,4 +27,13 @@ public interface IPlatform
 
     /// <summary>Vrai si l'utilisateur est inactif (aucune saisie) depuis le seuil donné.</summary>
     bool IsUserIdle(TimeSpan threshold);
+
+    /// <summary>Verrouille la session de l'utilisateur.</summary>
+    void Lock();
+
+    /// <summary>Redémarre le poste.</summary>
+    void Reboot();
+
+    /// <summary>Affiche un message à l'utilisateur (best-effort selon l'OS/la session).</summary>
+    void ShowMessage(string text);
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using Remina.Shared;
@@ -32,6 +33,47 @@ public abstract class PlatformBase : IPlatform
     public virtual bool IsUserIdle(TimeSpan threshold) => false;
 
     public abstract string GetHardwareId();
+
+    // --- Actions de commande (implémentations par OS, best-effort) ---
+
+    public virtual void Reboot()
+    {
+        if (OperatingSystem.IsWindows()) Run("shutdown", "/r", "/t", "0");
+        else if (OperatingSystem.IsMacOS()) Run("shutdown", "-r", "now");
+        else Run("systemctl", "reboot");
+    }
+
+    public virtual void Lock()
+    {
+        if (OperatingSystem.IsWindows())
+            Run("rundll32.exe", "user32.dll,LockWorkStation");
+        else if (OperatingSystem.IsMacOS())
+            Run("/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession", "-suspend");
+        else
+            Run("loginctl", "lock-sessions");
+    }
+
+    public virtual void ShowMessage(string text)
+    {
+        if (OperatingSystem.IsWindows())
+            Run("msg", "*", text); // msg.exe : présent sur Pro/Enterprise
+        else if (OperatingSystem.IsMacOS())
+            Run("osascript", "-e", $"display notification \"{text.Replace("\"", "'")}\" with title \"Remina\"");
+        else
+            Run("notify-send", "Remina", text);
+    }
+
+    /// <summary>Lance un processus sans fenêtre, sans attendre, en avalant les erreurs.</summary>
+    protected static void Run(string file, params string[] args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo(file) { UseShellExecute = false, CreateNoWindow = true };
+            foreach (var a in args) psi.ArgumentList.Add(a);
+            Process.Start(psi);
+        }
+        catch { /* best-effort : l'action peut échouer selon l'OS/la session */ }
+    }
 
     protected virtual string? GetCpuName() => null;
 

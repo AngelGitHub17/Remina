@@ -7,7 +7,7 @@ namespace Remina.Shared;
 /// </summary>
 public static class ReminaVersion
 {
-    public const string Semver = "0.0.7";
+    public const string Semver = "0.0.8";
 
     /// <summary>Date de build, renseignée au moment de la publication.</summary>
     public const string BuildDate = "20261114";

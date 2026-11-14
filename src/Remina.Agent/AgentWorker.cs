@@ -158,25 +158,26 @@ public class AgentWorker : BackgroundService
         switch (cmd.Type)
         {
             case AgentCommandType.ShowMessage:
-                _log.LogInformation("Message serveur : {Msg}", cmd.Payload);
+                _log.LogInformation("Message à afficher : {Msg}", cmd.Payload);
+                _platform.ShowMessage(cmd.Payload ?? "");
                 break;
             case AgentCommandType.Lock:
-                _log.LogInformation("Ordre : verrouiller la session.");
+                _log.LogInformation("Verrouillage de la session.");
+                _platform.Lock();
                 break;
             case AgentCommandType.Reboot:
-                _log.LogInformation("Ordre : redémarrer.");
+                _log.LogInformation("Redémarrage du poste.");
+                _platform.Reboot();
                 break;
             case AgentCommandType.PrintSummaryTicket:
-                _log.LogInformation("Ordre : imprimer le ticket récapitulatif.");
+                _log.LogInformation("Ordre : ticket récapitulatif (pas encore implémenté).");
                 break;
             case AgentCommandType.AutoLogin:
                 if (remoteSessionActive)
                     _log.LogInformation("Auto-login ignoré : session RDP active.");
                 else
-                    _log.LogInformation("Ordre : connexion automatique de session.");
+                    _log.LogInformation("Ordre : connexion automatique (pas encore implémenté).");
                 break;
         }
-        // v0 : les ordres sont tracés. Les actions système arriveront par OS,
-        // chacune dans son module de plateforme, avec le cadre de consentement.
     }
 }
