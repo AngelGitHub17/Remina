@@ -47,6 +47,8 @@ public record EnrollResponse
     public Guid MachineId { get; init; }
     public string AgentToken { get; init; } = "";
     public string MachineName { get; init; } = "";
+    /// <summary>Nom du bureau rejoint à l'inscription, si le code en désignait un.</summary>
+    public string? BureauName { get; init; }
 }
 
 /// <summary>Battement de cœur périodique : garde le poste « en ligne » et remonte l'état.</summary>

@@ -4,6 +4,10 @@ using Remina.Server.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Permet de tourner comme service Windows ou unité systemd.
+builder.Host.UseWindowsService(o => o.ServiceName = "Remina Server");
+builder.Host.UseSystemd();
+
 // Base de données : SQLite par défaut (simple à déployer sur Proxmox).
 // Pour PostgreSQL plus tard : remplacer UseSqlite par UseNpgsql + la chaîne de connexion.
 var conn = builder.Configuration.GetConnectionString("Remina")

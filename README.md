@@ -101,12 +101,61 @@ un heartbeat toutes les 30 s. Le poste apparaît dans `GET /api/admin/machines`.
 | GET | `/` `/health` | — | Version, état |
 | POST | `/api/agent/enroll` | code | Inscription d'un poste |
 | POST | `/api/agent/heartbeat` | jeton agent | État + récupération d'ordres |
-| POST | `/api/admin/enrollment-codes` | clé admin | Créer un code d'inscription |
-| GET | `/api/admin/machines` | clé admin | Lister les postes |
+| POST | `/api/admin/enrollment-codes` | clé admin | Créer un code d'inscription (option `bureauId`) |
+| GET | `/api/admin/machines` | clé admin | Lister les postes (avec leur bureau) |
 | POST | `/api/admin/machines/{id}/commands` | clé admin | Mettre un ordre en file |
+| POST | `/api/admin/bureaus` | clé admin | Créer un bureau (local) |
+| GET | `/api/admin/bureaus` | clé admin | Lister les bureaux + nombre de postes |
+| GET | `/api/admin/bureaus/{id}/machines` | clé admin | Postes d'un bureau |
+| POST | `/api/admin/machines/{id}/bureau` | clé admin | Rattacher/détacher un poste d'un bureau |
 
 Types d'ordres : `1` verrouiller, `2` redémarrer, `3` message, `4` ticket récapitulatif,
 `5` connexion automatique.
+
+## Bureaux (locaux)
+
+Un **bureau** = un local = un groupe de postes (comme les entités/lieux de GLPI). Un poste
+appartient à au plus un bureau. Deux façons de rattacher :
+
+- **À l'inscription** : créer le code avec un `bureauId` ; tout poste inscrit avec ce code
+  rejoint ce bureau automatiquement.
+- **Après coup** : `POST /api/admin/machines/{id}/bureau` avec `{"bureauId":"..."}`
+  (ou `null` pour détacher).
+
+```bash
+# 1. créer le bureau
+curl -X POST http://SERVER:5080/api/admin/bureaus \
+  -H "X-Admin-Key: ma-cle-admin" -H "Content-Type: application/json" \
+  -d '{"name":"Bureau Salon","location":"Maison - salon"}'
+# 2. code d'inscription lié à ce bureau
+curl -X POST http://SERVER:5080/api/admin/enrollment-codes \
+  -H "X-Admin-Key: ma-cle-admin" -H "Content-Type: application/json" \
+  -d '{"label":"Salon","maxUses":5,"expiresInHours":24,"bureauId":"<ID_DU_BUREAU>"}'
+```
+
+## Installateurs
+
+Produits par le workflow CI (artefacts, et Release sur tag) :
+
+- **Windows** : `Remina-Server-Setup.exe` / `Remina-Agent-Setup.exe` (Inno Setup). Ils
+  demandent l'URL du serveur / la clé admin, écrivent la config et enregistrent un
+  **service Windows**.
+- **Linux** : ZIP `*-linux-x64` contenant le binaire, l'unité systemd et `install.sh` :
+  `sudo ./install.sh server` ou `sudo ./install.sh agent` (service systemd, config guidée).
+- **macOS** : ZIP `Remina-Agent-osx-*` avec `install.sh` et un LaunchDaemon :
+  `sudo ./install.sh`.
+
+## Proxmox (script LXC)
+
+Sur l'hôte Proxmox VE, en root — crée un conteneur Debian 12 et y installe le serveur :
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/AngelGitHub17/Remina/main/scripts/proxmox/remina-lxc.sh)"
+```
+
+Paramètres surchargeables en variables d'environnement : `CTID`, `RAM_MB`, `CORES`,
+`DISK_GB`, `BRIDGE`, `STORAGE`, `PORT`, `ADMIN_KEY`. Le script récupère le binaire depuis
+la dernière **Release** du dépôt : publie d'abord un tag `vX.Y.Z`.
 
 ## Pile par plateforme (agent)
 

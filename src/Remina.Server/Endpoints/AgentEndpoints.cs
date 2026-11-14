@@ -48,15 +48,25 @@ public static class AgentEndpoints
             machine.AgentTokenHash = TokenService.Hash(token);
             machine.LastSeenAt = now;
 
+            // Si le code désigne un bureau, le poste le rejoint (sauf s'il en a déjà un).
+            if (code.BureauId is not null && machine.BureauId is null)
+                machine.BureauId = code.BureauId;
+
             code.RemainingUses--;
 
             await db.SaveChangesAsync();
+
+            var bureauName = machine.BureauId is null
+                ? null
+                : await db.Bureaus.Where(bu => bu.Id == machine.BureauId)
+                    .Select(bu => bu.Name).FirstOrDefaultAsync();
 
             return Results.Ok(new EnrollResponse
             {
                 MachineId = machine.Id,
                 AgentToken = token,
                 MachineName = machine.Name,
+                BureauName = bureauName,
             });
         });
 

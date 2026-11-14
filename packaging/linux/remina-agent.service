@@ -1,0 +1,15 @@
+[Unit]
+Description=Remina Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+WorkingDirectory=/opt/remina/agent
+ExecStart=/opt/remina/agent/Remina.Agent
+EnvironmentFile=-/etc/remina/agent.env
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

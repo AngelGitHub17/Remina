@@ -1,0 +1,17 @@
+[Unit]
+Description=Remina Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+WorkingDirectory=/opt/remina/server
+ExecStart=/opt/remina/server/Remina.Server
+EnvironmentFile=-/etc/remina/server.env
+Restart=on-failure
+RestartSec=5
+User=remina
+Group=remina
+
+[Install]
+WantedBy=multi-user.target

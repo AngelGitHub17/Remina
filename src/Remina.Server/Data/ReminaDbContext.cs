@@ -7,6 +7,7 @@ public class ReminaDbContext : DbContext
     public ReminaDbContext(DbContextOptions<ReminaDbContext> options) : base(options) { }
 
     public DbSet<Machine> Machines => Set<Machine>();
+    public DbSet<Bureau> Bureaus => Set<Bureau>();
     public DbSet<EnrollmentCode> EnrollmentCodes => Set<EnrollmentCode>();
     public DbSet<AgentCommandRecord> AgentCommands => Set<AgentCommandRecord>();
 
@@ -20,6 +21,16 @@ public class ReminaDbContext : DbContext
              .WithOne(c => c.Machine!)
              .HasForeignKey(c => c.MachineId)
              .OnDelete(DeleteBehavior.Cascade);
+            // Supprimer un bureau détache ses postes (ne les supprime pas).
+            e.HasOne(m => m.Bureau)
+             .WithMany(bu => bu.Machines)
+             .HasForeignKey(m => m.BureauId)
+             .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<Bureau>(e =>
+        {
+            e.HasIndex(bu => bu.Name).IsUnique();
         });
 
         b.Entity<EnrollmentCode>(e =>

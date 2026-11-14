@@ -19,6 +19,10 @@ public class Machine
     public string? PrimaryMacAddress { get; set; }
     public string AgentVersion { get; set; } = "";
 
+    /// <summary>Bureau (local) auquel le poste est rattaché, si connu.</summary>
+    public Guid? BureauId { get; set; }
+    public Bureau? Bureau { get; set; }
+
     /// <summary>Hachage du jeton d'agent (jamais stocké en clair).</summary>
     public string AgentTokenHash { get; set; } = "";
 
@@ -32,6 +36,22 @@ public class Machine
 }
 
 /// <summary>
+/// Bureau = un local, un groupe de postes (façon « entité »/« lieu » de GLPI).
+/// Un poste appartient à au plus un bureau.
+/// </summary>
+public class Bureau
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = "";
+    public string? Description { get; set; }
+    /// <summary>Emplacement physique (bâtiment, salle, adresse courte...).</summary>
+    public string? Location { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public List<Machine> Machines { get; set; } = new();
+}
+
+/// <summary>
 /// Code d'inscription à usage limité, généré par l'admin (façon GLPI).
 /// </summary>
 public class EnrollmentCode
@@ -39,6 +59,8 @@ public class EnrollmentCode
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Code { get; set; } = "";
     public string? Label { get; set; }
+    /// <summary>Si défini, tout poste inscrit avec ce code rejoint ce bureau.</summary>
+    public Guid? BureauId { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? ExpiresAt { get; set; }
     /// <summary>Nombre d'inscriptions encore autorisées avec ce code.</summary>
