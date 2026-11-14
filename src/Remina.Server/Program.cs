@@ -30,7 +30,11 @@ using (var scope = app.Services.CreateScope())
     db.Database.EnsureCreated();
 }
 
-app.MapGet("/", () => Results.Ok(new
+// Console web d'administration (wwwroot/index.html) servie à la racine.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
+app.MapGet("/api/version", () => Results.Ok(new
 {
     product = "Remina Server",
     version = Remina.Shared.ReminaVersion.Full,

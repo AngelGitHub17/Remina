@@ -61,6 +61,14 @@ Remina.Server.exe
 Remina.Agent.exe
 ```
 
+## Console web
+
+Le serveur sert une console d'administration à sa racine (`http://SERVER:5080/`) :
+postes (état en ligne/RDP, utilisateur, rattachement à un bureau, commandes), bureaux
+(liste/création) et génération de codes d'inscription. Elle s'authentifie avec la clé
+admin (`X-Admin-Key`), conservée le temps de la session du navigateur. La liste des postes
+se rafraîchit toute seule toutes les 20 s.
+
 ## Démarrer le serveur (depuis les sources)
 
 ```bash

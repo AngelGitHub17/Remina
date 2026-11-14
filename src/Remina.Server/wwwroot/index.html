@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Remina — Console</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --txt:#e6e8ee; --muted:#9aa3b2; --accent:#5b8cff; --ok:#3ecf8e; --off:#6b7280;
+    --warn:#f5a623; --danger:#ef4444;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); }
+  header { display:flex; align-items:center; gap:12px; padding:12px 18px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; letter-spacing:.3px; }
+  header .ver { color:var(--muted); font-size:12px; }
+  header .spacer { flex:1; }
+  input, select, button { font:inherit; color:var(--txt); background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:7px 10px; }
+  input::placeholder { color:var(--muted); }
+  button { cursor:pointer; background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  button.sec { background:var(--panel2); color:var(--txt); border-color:var(--line); font-weight:500; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  nav { display:flex; gap:4px; padding:10px 18px 0; }
+  nav button { background:transparent; border:none; color:var(--muted); border-bottom:2px solid transparent; border-radius:0; padding:8px 12px; font-weight:600; }
+  nav button.active { color:var(--txt); border-bottom-color:var(--accent); }
+  main { padding:18px; max-width:1100px; margin:0 auto; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .card h2 { margin:0 0 12px; font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row > * { flex:0 0 auto; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; }
+  .dot.on { background:var(--ok); } .dot.off { background:var(--off); }
+  .tag { font-size:11px; padding:2px 8px; border-radius:20px; background:var(--panel2); border:1px solid var(--line); color:var(--muted); }
+  .tag.rdp { color:var(--warn); border-color:var(--warn); }
+  .muted { color:var(--muted); }
+  .hide { display:none; }
+  .toast { position:fixed; bottom:18px; right:18px; background:var(--panel2); border:1px solid var(--line); border-left:3px solid var(--accent); padding:10px 14px; border-radius:8px; max-width:360px; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+  .toast.err { border-left-color:var(--danger); }
+  code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
+  .gate { max-width:420px; margin:12vh auto; }
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate card">
+  <h2>Connexion à la console</h2>
+  <p class="muted">Renseigne la clé d'administration du serveur (en-tête <code>X-Admin-Key</code>).</p>
+  <div class="row">
+    <input id="keyInput" type="password" placeholder="Clé d'administration" style="flex:1">
+    <button onclick="login()">Entrer</button>
+  </div>
+  <p id="gateErr" class="muted" style="color:var(--danger)"></p>
+</div>
+
+<div id="app" class="hide">
+  <header>
+    <h1>Remina</h1>
+    <span class="ver" id="serverVer">—</span>
+    <div class="spacer"></div>
+    <button class="sec" onclick="refresh()">Rafraîchir</button>
+    <button class="sec" onclick="logout()">Quitter</button>
+  </header>
+  <nav>
+    <button data-tab="machines" class="active" onclick="tab('machines')">Postes</button>
+    <button data-tab="bureaus" onclick="tab('bureaus')">Bureaux</button>
+    <button data-tab="codes" onclick="tab('codes')">Codes d'inscription</button>
+  </nav>
+  <main>
+
+    <section id="tab-machines">
+      <div class="card">
+        <h2>Postes</h2>
+        <table>
+          <thead><tr><th>État</th><th>Nom</th><th>OS</th><th>Utilisateur</th><th>Bureau</th><th>Vu</th><th>Actions</th></tr></thead>
+          <tbody id="machinesBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-bureaus" class="hide">
+      <div class="card">
+        <h2>Nouveau bureau (local)</h2>
+        <div class="row">
+          <input id="buName" placeholder="Nom (ex : Bureau Salon)">
+          <input id="buLoc" placeholder="Emplacement (optionnel)">
+          <input id="buDesc" placeholder="Description (optionnel)" style="flex:1">
+          <button onclick="createBureau()">Créer</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Bureaux</h2>
+        <table>
+          <thead><tr><th>Nom</th><th>Emplacement</th><th>Description</th><th>Postes</th></tr></thead>
+          <tbody id="bureausBody"><tr><td colspan="4" class="muted">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-codes" class="hide">
+      <div class="card">
+        <h2>Générer un code d'inscription</h2>
+        <div class="row">
+          <input id="cdLabel" placeholder="Libellé (ex : Salon)">
+          <input id="cdUses" type="number" value="1" min="1" style="width:90px" title="Nombre d'utilisations">
+          <input id="cdHours" type="number" value="24" min="0" style="width:110px" title="Expiration (heures, 0 = jamais)">
+          <select id="cdBureau"><option value="">— Sans bureau —</option></select>
+          <button onclick="createCode()">Générer</button>
+        </div>
+        <div id="codeOut" class="hide" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+const State = { key:"", machines:[], bureaus:[] };
+const CMD = { Lock:1, Reboot:2, ShowMessage:3, PrintSummaryTicket:4, AutoLogin:5 };
+const OS = { 0:"Inconnu", 1:"Windows", 2:"macOS", 3:"Linux" };
+
+function toast(msg, err=false){
+  const t=document.createElement("div"); t.className="toast"+(err?" err":""); t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 3500);
+}
+async function api(path, opts={}){
+  opts.headers = Object.assign({ "X-Admin-Key": State.key, "Content-Type":"application/json" }, opts.headers||{});
+  const r = await fetch(path, opts);
+  if (r.status===401) { logout(); throw new Error("Clé refusée."); }
+  if (!r.ok) throw new Error("Erreur "+r.status);
+  return r.status===204 ? null : r.json();
+}
+
+async function login(){
+  State.key = document.getElementById("keyInput").value.trim();
+  if (!State.key) return;
+  try {
+    await api("/api/admin/bureaus");               // valide la clé
+    sessionStorage.setItem("remina_key", State.key);
+    document.getElementById("gate").classList.add("hide");
+    document.getElementById("app").classList.remove("hide");
+    const v = await (await fetch("/api/version")).json().catch(()=>null);
+    if (v) document.getElementById("serverVer").textContent = v.version || "";
+    refresh();
+  } catch(e){ document.getElementById("gateErr").textContent = e.message; }
+}
+function logout(){
+  sessionStorage.removeItem("remina_key"); State.key="";
+  document.getElementById("app").classList.add("hide");
+  document.getElementById("gate").classList.remove("hide");
+}
+function tab(name){
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active", b.dataset.tab===name));
+  ["machines","bureaus","codes"].forEach(n=>document.getElementById("tab-"+n).classList.toggle("hide", n!==name));
+}
+
+async function refresh(){
+  try {
+    const [m,b] = await Promise.all([ api("/api/admin/machines"), api("/api/admin/bureaus") ]);
+    State.machines=m; State.bureaus=b; renderMachines(); renderBureaus(); fillBureauSelect();
+  } catch(e){ toast(e.message, true); }
+}
+
+function ago(iso){
+  if(!iso) return "jamais";
+  const s=Math.floor((Date.now()-new Date(iso))/1000);
+  if(s<60) return "il y a "+s+" s"; if(s<3600) return "il y a "+Math.floor(s/60)+" min";
+  if(s<86400) return "il y a "+Math.floor(s/3600)+" h"; return "il y a "+Math.floor(s/86400)+" j";
+}
+
+function renderMachines(){
+  const body=document.getElementById("machinesBody");
+  if(!State.machines.length){ body.innerHTML='<tr><td colspan="7" class="muted">Aucun poste inscrit.</td></tr>'; return; }
+  const opts = '<option value="">— Aucun —</option>' +
+    State.bureaus.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("");
+  body.innerHTML = State.machines.map(m=>`
+    <tr>
+      <td><span class="dot ${m.online?'on':'off'}"></span>${m.online?'en ligne':'hors ligne'}
+          ${m.remoteSessionActive?'<span class="tag rdp">RDP</span>':''}</td>
+      <td>${esc(m.name)}</td>
+      <td>${OS[m.os]||'?'}</td>
+      <td>${esc(m.currentUser||'—')}</td>
+      <td><select onchange="assignBureau('${m.id}', this.value)">${opts.replace('value="'+(m.bureauId||'')+'"','value="'+(m.bureauId||'')+'" selected')}</select></td>
+      <td class="muted">${ago(m.lastSeenAt)}</td>
+      <td class="row">
+        <button class="sec" onclick="cmd('${m.id}',${CMD.Lock})">Verrouiller</button>
+        <button class="sec" onclick="cmd('${m.id}',${CMD.Reboot})">Redémarrer</button>
+        <button class="sec" onclick="msgCmd('${m.id}')">Message</button>
+        <button class="sec" onclick="cmd('${m.id}',${CMD.PrintSummaryTicket})">Ticket</button>
+      </td>
+    </tr>`).join("");
+}
+function renderBureaus(){
+  const body=document.getElementById("bureausBody");
+  if(!State.bureaus.length){ body.innerHTML='<tr><td colspan="4" class="muted">Aucun bureau.</td></tr>'; return; }
+  body.innerHTML = State.bureaus.map(b=>`
+    <tr><td>${esc(b.name)}</td><td>${esc(b.location||'—')}</td><td class="muted">${esc(b.description||'')}</td><td>${b.machineCount}</td></tr>`).join("");
+}
+function fillBureauSelect(){
+  document.getElementById("cdBureau").innerHTML =
+    '<option value="">— Sans bureau —</option>' +
+    State.bureaus.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("");
+}
+
+async function createBureau(){
+  const name=document.getElementById("buName").value.trim();
+  if(!name) return toast("Nom requis.", true);
+  try {
+    await api("/api/admin/bureaus",{method:"POST",body:JSON.stringify({
+      name, location:document.getElementById("buLoc").value.trim()||null,
+      description:document.getElementById("buDesc").value.trim()||null })});
+    document.getElementById("buName").value=document.getElementById("buLoc").value=document.getElementById("buDesc").value="";
+    toast("Bureau créé."); refresh();
+  } catch(e){ toast(e.message, true); }
+}
+async function assignBureau(id, bureauId){
+  try { await api(`/api/admin/machines/${id}/bureau`,{method:"POST",body:JSON.stringify({bureauId:bureauId||null})});
+    toast("Poste rattaché."); refresh(); } catch(e){ toast(e.message, true); }
+}
+async function cmd(id, type, payload=null){
+  try { await api(`/api/admin/machines/${id}/commands`,{method:"POST",body:JSON.stringify({type,payload})});
+    toast("Commande envoyée."); } catch(e){ toast(e.message, true); }
+}
+function msgCmd(id){ const t=prompt("Message à afficher sur le poste :"); if(t) cmd(id, CMD.ShowMessage, t); }
+
+async function createCode(){
+  try {
+    const r = await api("/api/admin/enrollment-codes",{method:"POST",body:JSON.stringify({
+      label:document.getElementById("cdLabel").value.trim()||null,
+      maxUses:parseInt(document.getElementById("cdUses").value)||1,
+      expiresInHours:parseInt(document.getElementById("cdHours").value)||0,
+      bureauId:document.getElementById("cdBureau").value||null })});
+    const out=document.getElementById("codeOut"); out.classList.remove("hide");
+    out.innerHTML = `Code : <code style="font-size:16px">${esc(r.code)}</code> — ${r.remainingUses} utilisation(s)` +
+      (r.expiresAt?`, expire le ${new Date(r.expiresAt).toLocaleString('fr-FR')}`:", sans expiration");
+    toast("Code généré.");
+  } catch(e){ toast(e.message, true); }
+}
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// auto-login si une clé est en session
+window.addEventListener("load", ()=>{
+  const k=sessionStorage.getItem("remina_key");
+  if(k){ document.getElementById("keyInput").value=k; login(); }
+});
+// rafraîchissement auto des postes toutes les 20 s
+setInterval(()=>{ if(State.key && !document.getElementById("app").classList.contains("hide")) refresh(); }, 20000);
+</script>
+</body>
+</html>
