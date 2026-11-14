@@ -36,6 +36,19 @@ ASSET="Remina-Server-linux-x64.zip"
 
 info "Conteneur CTID=${CTID}, hôte=${HOSTNAME_}, ${CORES} vCPU / ${RAM_MB} Mo / ${DISK_GB} Go, pont=${BRIDGE}"
 
+# ------- stockage du rootfs (content: rootdir) -------
+# Si le stockage demandé n'existe pas / ne peut pas héberger de conteneur, on en choisit un.
+if ! pvesm status --content rootdir 2>/dev/null | awk 'NR>1{print $1}' | grep -qx "$STORAGE"; then
+  AUTO="$(pvesm status --content rootdir 2>/dev/null | awk 'NR>1{print $1; exit}')"
+  if [[ -n "$AUTO" ]]; then
+    warn "Stockage '$STORAGE' indisponible pour un conteneur — utilisation de '$AUTO'."
+    STORAGE="$AUTO"
+  else
+    die "Aucun stockage 'rootdir' trouvé. Précise-le : STORAGE=<nom> bash -c \"\$(curl …)\""
+  fi
+fi
+info "Stockage rootfs : ${STORAGE}"
+
 # ------- modèle Debian (nom résolu dynamiquement depuis le catalogue) -------
 info "Recherche du modèle Debian 12…"
 pveam update >/dev/null 2>&1 || true
