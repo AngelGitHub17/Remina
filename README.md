@@ -190,6 +190,16 @@ Paramètres surchargeables en variables d'environnement : `CTID`, `RAM_MB`, `COR
 `DISK_GB`, `BRIDGE`, `STORAGE`, `PORT`, `ADMIN_KEY`. Le script récupère le binaire depuis
 la dernière **Release** du dépôt : publie d'abord un tag `vX.Y.Z`.
 
+Mettre à jour le serveur du conteneur (depuis l'hôte Proxmox) :
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/AngelGitHub17/Remina/main/ct/remina-update.sh)"
+```
+
+Conteneur auto-détecté (nommé `remina`) ou `CTID=<id>`. La config (`/etc/remina`) et la
+base (`remina.db`) sont conservées. À partir de la v0.0.3, le serveur se met de toute façon
+à jour seul (vérification toutes les 6 h).
+
 ## Pile par plateforme (agent)
 
 - **Windows** : identifiant via `MachineGuid`, RDP via `SM_REMOTESESSION`, inactivité via
