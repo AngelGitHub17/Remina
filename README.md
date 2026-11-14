@@ -145,12 +145,37 @@ Produits par le workflow CI (artefacts, et Release sur tag) :
 - **macOS** : ZIP `Remina-Agent-osx-*` avec `install.sh` et un LaunchDaemon :
   `sudo ./install.sh`.
 
+## Mise à jour automatique
+
+Le serveur et l'agent se mettent à jour seuls à partir des **Releases GitHub** :
+
+- Le serveur interroge la dernière Release (en cache) et expose
+  `GET /api/update?app=agent|server&rid=...&current=...`.
+- Chaque agent demande au serveur s'il existe une version plus récente (toutes les 6 h
+  par défaut) ; le serveur vérifie aussi sa propre version.
+- Si oui : téléchargement de l'archive du bon RID → mise en attente dans `update/` →
+  un court script d'aide attend l'arrêt du processus, recopie les fichiers (sans toucher
+  à `appsettings.json`) et redémarre le service.
+
+Réglages (config ou variables `Remina__Update__*`) :
+
+| Clé | Défaut | Rôle |
+|---|---|---|
+| `Remina:Update:Enabled` | `true` | Active/désactive l'auto-update |
+| `Remina:Update:Repo` | `AngelGitHub17/Remina` | Dépôt source des Releases |
+| `Remina:Update:CheckHours` | `6` | Intervalle de vérification |
+| `Remina:Update:CacheMinutes` | `30` | Cache de l'info de Release (serveur) |
+| `Remina:Update:ServiceName` | auto | Nom du service à redémarrer |
+
+> Les unités systemd/launchd et le service Windows sont réglés pour laisser le script de
+> bascule survivre à l'arrêt du binaire et ne pas redémarrer en double.
+
 ## Proxmox (script LXC)
 
 Sur l'hôte Proxmox VE, en root — crée un conteneur Debian 12 et y installe le serveur :
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/AngelGitHub17/Remina/main/scripts/proxmox/remina-lxc.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/AngelGitHub17/Remina/main/ct/remina.sh)"
 ```
 
 Paramètres surchargeables en variables d'environnement : `CTID`, `RAM_MB`, `CORES`,

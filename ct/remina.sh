@@ -2,7 +2,7 @@
 # =====================================================================
 #  Remina Server — script d'installation LXC pour Proxmox VE
 #  À lancer sur l'HÔTE Proxmox, en root :
-#     bash -c "$(curl -fsSL https://raw.githubusercontent.com/AngelGitHub17/Remina/main/scripts/proxmox/remina-lxc.sh)"
+#     bash -c "$(curl -fsSL https://raw.githubusercontent.com/AngelGitHub17/Remina/main/ct/remina.sh)"
 #
 #  Crée un conteneur Debian 12, y installe le serveur Remina (binaire
 #  autonome, aucun .NET requis) en service systemd, et l'expose en HTTP.

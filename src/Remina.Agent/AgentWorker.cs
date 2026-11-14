@@ -42,10 +42,20 @@ public class AgentWorker : BackgroundService
             _cfg.GetValue("Remina:IdleMinutes", 5));
         int nextDelay = 30;
 
+        var updateEnabled = _cfg.GetValue("Remina:Update:Enabled", true);
+        var updateEvery = TimeSpan.FromHours(_cfg.GetValue("Remina:Update:CheckHours", 6));
+        var nextUpdateCheck = DateTimeOffset.UtcNow.AddMinutes(1); // première vérif après 1 min
+
         while (!ct.IsCancellationRequested)
         {
             try
             {
+                if (updateEnabled && DateTimeOffset.UtcNow >= nextUpdateCheck)
+                {
+                    nextUpdateCheck = DateTimeOffset.UtcNow + updateEvery;
+                    await TrySelfUpdateAsync(ct); // ne revient pas si une mise à jour s'applique
+                }
+
                 var remote = _platform.IsRemoteSessionActive();
                 var hb = new HeartbeatRequest
                 {
@@ -108,6 +118,32 @@ public class AgentWorker : BackgroundService
         _log.LogInformation("Poste inscrit : {Name} ({Id})", resp.MachineName, resp.MachineId);
         return true;
     }
+
+    private async Task TrySelfUpdateAsync(CancellationToken ct)
+    {
+        try
+        {
+            var res = await _client.CheckUpdateAsync(Updater.CurrentRid, ReminaVersion.Semver, ct);
+            if (res is null || !res.UpdateAvailable || res.DownloadUrl is null) return;
+
+            _log.LogInformation("Mise à jour agent {Ver} disponible.", res.LatestVersion);
+            using var http = ServerClient.DownloadClient();
+            await Updater.DownloadAndStageAsync(http, res.DownloadUrl,
+                AppContext.BaseDirectory, m => _log.LogInformation("{M}", m), ct);
+            Updater.LaunchHelperAndExit(AppContext.BaseDirectory, "Remina.Agent",
+                ServiceName(), m => _log.LogInformation("{M}", m));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _log.LogWarning(ex, "Auto-update agent : échec de la vérification.");
+        }
+    }
+
+    private string? ServiceName() =>
+        _cfg["Remina:Update:ServiceName"]
+        ?? (OperatingSystem.IsWindows() ? "ReminaAgent"
+            : OperatingSystem.IsLinux() ? "remina-agent"
+            : OperatingSystem.IsMacOS() ? "fr.nounourscorp.remina.agent" : null);
 
     private void HandleCommand(AgentCommand cmd, bool remoteSessionActive)
     {

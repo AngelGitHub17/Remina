@@ -10,6 +10,8 @@ ExecStart=/opt/remina/server/Remina.Server
 EnvironmentFile=-/etc/remina/server.env
 Restart=on-failure
 RestartSec=5
+# Ne pas tuer le script de bascule de mise à jour quand le binaire s'arrête.
+KillMode=process
 User=remina
 Group=remina
 

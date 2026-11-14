@@ -14,8 +14,12 @@
   <string>/opt/remina/agent</string>
   <key>RunAtLoad</key>
   <true/>
+  <!-- Redémarre seulement sur sortie anormale : laisse la bascule de mise à jour relancer. -->
   <key>KeepAlive</key>
-  <true/>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
   <key>StandardOutPath</key>
   <string>/var/log/remina-agent.log</string>
   <key>StandardErrorPath</key>

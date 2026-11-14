@@ -16,6 +16,11 @@ builder.Services.AddDbContext<ReminaDbContext>(o => o.UseSqlite(conn));
 
 builder.Services.AddEndpointsApiExplorer();
 
+// Auto-mise à jour : fournisseur d'info (Releases GitHub) + vérificateur en tâche de fond.
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<Remina.Server.Services.UpdateProvider>();
+builder.Services.AddHostedService<Remina.Server.Services.ServerSelfUpdater>();
+
 var app = builder.Build();
 
 // Création/migration du schéma au démarrage (suffisant pour la v0).
@@ -35,5 +40,6 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 app.MapAgentEndpoints();
 app.MapAdminEndpoints();
+app.MapUpdateEndpoints();
 
 app.Run();

@@ -10,6 +10,8 @@ ExecStart=/opt/remina/agent/Remina.Agent
 EnvironmentFile=-/etc/remina/agent.env
 Restart=on-failure
 RestartSec=10
+# Ne pas tuer le script de bascule de mise à jour quand le binaire s'arrête.
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target
