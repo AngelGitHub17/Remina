@@ -31,17 +31,23 @@ STORAGE="${STORAGE:-local-lvm}"
 TMPL_STORAGE="${TMPL_STORAGE:-local}"
 PORT="${PORT:-5080}"
 ADMIN_KEY="${ADMIN_KEY:-$(head -c16 /dev/urandom | od -An -tx1 | tr -d ' \n')}"
-TEMPLATE="debian-12-standard_12.7-1_amd64.tar.zst"
 REPO="AngelGitHub17/Remina"
 ASSET="Remina-Server-linux-x64.zip"
 
 info "Conteneur CTID=${CTID}, hôte=${HOSTNAME_}, ${CORES} vCPU / ${RAM_MB} Mo / ${DISK_GB} Go, pont=${BRIDGE}"
 
-# ------- modèle Debian -------
-if ! pveam list "$TMPL_STORAGE" 2>/dev/null | grep -q "$TEMPLATE"; then
+# ------- modèle Debian (nom résolu dynamiquement depuis le catalogue) -------
+info "Recherche du modèle Debian 12…"
+pveam update >/dev/null 2>&1 || true
+# Un modèle déjà téléchargé est réutilisé ; sinon on prend le plus récent du catalogue.
+TEMPLATE="${TEMPLATE:-$(pveam list "$TMPL_STORAGE" 2>/dev/null | awk '/debian-12-standard/{print $1}' | sed 's#.*/##' | sort -V | tail -1)}"
+if [[ -z "$TEMPLATE" ]]; then
+  TEMPLATE="$(pveam available --section system 2>/dev/null | awk '/debian-12-standard/{print $NF}' | sort -V | tail -1)"
+  [[ -n "$TEMPLATE" ]] || die "Aucun modèle 'debian-12-standard' dans le catalogue (essaie: pveam available)."
   info "Téléchargement du modèle $TEMPLATE…"
-  pveam update >/dev/null 2>&1 || true
   pveam download "$TMPL_STORAGE" "$TEMPLATE" || die "Échec du téléchargement du modèle Debian 12."
+else
+  msg "Modèle déjà présent : $TEMPLATE"
 fi
 
 # ------- création du conteneur -------
