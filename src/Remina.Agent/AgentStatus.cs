@@ -28,4 +28,9 @@ public class AgentStatus
     /// <summary>Déclenché à chaque changement d'état (pour rafraîchir l'UI).</summary>
     public event Action? Changed;
     public void NotifyChanged() => Changed?.Invoke();
+
+    /// <summary>Demande d'impression du ticket (texte). L'UI, si présente, affiche le dialogue.</summary>
+    public event Action<string>? PrintTicketRequested;
+    public bool HasPrintHandler => PrintTicketRequested != null;
+    public void RequestPrint(string text) => PrintTicketRequested?.Invoke(text);
 }

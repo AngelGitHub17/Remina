@@ -3,6 +3,9 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
+using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using Remina.Agent;
 
 namespace Remina.Agent.Tray;
 
@@ -35,6 +38,12 @@ public partial class App : Application
 
             // Démarre réduit dans la barre des tâches ; la fenêtre s'ouvre à la demande.
             desktop.MainWindow = _window;
+
+            // Demande d'impression du ticket → dialogue avec compte à rebours.
+            var status = Program.AppHost?.Services.GetService<AgentStatus>();
+            if (status is not null)
+                status.PrintTicketRequested += text =>
+                    Dispatcher.UIThread.Post(() => new PrintDialog(text).Show());
         }
         base.OnFrameworkInitializationCompleted();
     }

@@ -334,11 +334,16 @@ public static class AdminEndpoints
             var machine = await db.Machines.FindAsync(id);
             if (machine is null) return Results.NotFound();
 
+            // Pour un ticket, on joint le texte à imprimer (jour courant) si non fourni.
+            var payload = dto.Payload;
+            if (dto.Type == AgentCommandType.PrintSummaryTicket && string.IsNullOrEmpty(payload))
+                payload = await TicketService.BuildTextAsync(db, DateOnly.FromDateTime(DateTime.Now));
+
             var cmd = new AgentCommandRecord
             {
                 MachineId = id,
                 Type = dto.Type,
-                Payload = dto.Payload,
+                Payload = payload,
             };
             db.AgentCommands.Add(cmd);
             await db.SaveChangesAsync();

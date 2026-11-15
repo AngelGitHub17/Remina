@@ -295,7 +295,17 @@ public class AgentWorker : BackgroundService
                 _platform.Reboot();
                 break;
             case AgentCommandType.PrintSummaryTicket:
-                _log.LogInformation("Ordre : ticket récapitulatif (pas encore implémenté).");
+                var ticket = cmd.Payload ?? "";
+                if (_status.HasPrintHandler)
+                {
+                    _log.LogInformation("Ticket reçu : demande de confirmation à l'utilisateur.");
+                    _status.RequestPrint(ticket); // l'UI affiche le dialogue + compte à rebours
+                }
+                else
+                {
+                    _log.LogInformation("Ticket reçu : impression directe (pas d'interface).");
+                    Printing.Print(ticket);
+                }
                 break;
             case AgentCommandType.AutoLogin:
                 if (remoteSessionActive)

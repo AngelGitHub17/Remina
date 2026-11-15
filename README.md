@@ -89,6 +89,19 @@ jour : le **temps saisi** manuellement (par projet) et l'**activité automatique
 et par appli, avec les totaux. Bouton *Ticket imprimable* dans l'onglet *Récap* de la
 console. API : `GET /api/admin/recap?day=...`.
 
+**Impression sur un poste** : le bouton *Ticket* d'un poste envoie le ticket du jour à son
+agent. L'agent **graphique** affiche « Imprimer le récapitulatif ? » avec un compte à
+rebours de 5 min — sans action, il imprime sur l'imprimante par défaut (Windows : Out-Printer ;
+Linux/macOS : CUPS). L'agent service imprime directement.
+
+**Impression programmée** (ex : fermeture du bureau), config serveur :
+
+| Clé | Défaut | Rôle |
+|---|---|---|
+| `Remina:Recap:AutoPrint` | `false` | Active l'envoi automatique |
+| `Remina:Recap:Hour` / `Minute` | `20` / `0` | Heure d'envoi |
+| `Remina:Recap:MachineName` | (vide) | Poste qui imprime (vide = le plus récemment vu) |
+
 ## Console web
 
 Le serveur sert une console d'administration à sa racine (`http://SERVER:5080/`) :

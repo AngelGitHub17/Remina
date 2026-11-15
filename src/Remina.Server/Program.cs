@@ -21,6 +21,7 @@ builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<Remina.Server.Services.UpdateProvider>();
 builder.Services.AddHostedService<Remina.Server.Services.ServerSelfUpdater>();
+builder.Services.AddHostedService<Remina.Server.Services.RecapScheduler>();
 
 var app = builder.Build();
 

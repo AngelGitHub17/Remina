@@ -1,0 +1,21 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Remina.Agent.Tray.PrintDialog"
+        Title="Imprimer le récapitulatif ?" Width="460" Height="520"
+        WindowStartupLocation="CenterScreen" Background="#0f1115" Topmost="True">
+  <Border Padding="18">
+    <DockPanel>
+      <TextBlock DockPanel.Dock="Top" Text="Imprimer le récapitulatif ?" FontSize="17" FontWeight="Bold" Foreground="#e6e8ee"/>
+      <TextBlock DockPanel.Dock="Top" x:Name="Countdown" Foreground="#f5a623" Margin="0,4,0,10"/>
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+        <Button Content="Annuler" Click="OnCancel"/>
+        <Button Content="Imprimer" Click="OnPrint" Background="#5b8cff" Foreground="#fff"/>
+      </StackPanel>
+      <Border Background="#171a21" CornerRadius="8" Padding="10">
+        <ScrollViewer>
+          <TextBlock x:Name="Preview" FontFamily="Consolas,Menlo,monospace" FontSize="12" Foreground="#cfd3dc" TextWrapping="NoWrap"/>
+        </ScrollViewer>
+      </Border>
+    </DockPanel>
+  </Border>
+</Window>
