@@ -97,6 +97,25 @@ public static class AdminEndpoints
             return Results.Ok(machines);
         });
 
+        // Activité d'un poste pour un jour donné (par défaut aujourd'hui), cumul par appli.
+        g.MapGet("/machines/{id:guid}/activity", async (
+            Guid id, string? day, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+
+            var d = DateOnly.TryParse(day, out var parsed)
+                ? parsed : DateOnly.FromDateTime(DateTime.Now);
+
+            var apps = await db.Activity
+                .Where(a => a.MachineId == id && a.Day == d)
+                .GroupBy(a => a.App)
+                .Select(g => new { App = g.Key, Seconds = g.Sum(x => x.Seconds) })
+                .OrderByDescending(x => x.Seconds)
+                .ToListAsync();
+
+            return Results.Ok(new { day = d.ToString("yyyy-MM-dd"), apps });
+        });
+
         // Rattache (ou détache avec bureauId=null) un poste à un bureau.
         g.MapPost("/machines/{id:guid}/bureau", async (
             Guid id, AssignBureauDto dto, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>

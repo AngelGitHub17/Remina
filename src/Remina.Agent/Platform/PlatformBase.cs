@@ -63,6 +63,10 @@ public abstract class PlatformBase : IPlatform
             Run("notify-send", "Remina", text);
     }
 
+    // Premier plan : par défaut inconnu (surchargé sur Windows). Linux/Wayland et macOS
+    // nécessiteront des autorisations/extensions dédiées, ajoutées plus tard.
+    public virtual (string App, string? Title)? GetForegroundApp() => null;
+
     /// <summary>Lance un processus sans fenêtre, sans attendre, en avalant les erreurs.</summary>
     protected static void Run(string file, params string[] args)
     {

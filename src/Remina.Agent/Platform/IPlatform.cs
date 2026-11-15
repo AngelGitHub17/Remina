@@ -36,4 +36,10 @@ public interface IPlatform
 
     /// <summary>Affiche un message à l'utilisateur (best-effort selon l'OS/la session).</summary>
     void ShowMessage(string text);
+
+    /// <summary>
+    /// Appli au premier plan : nom du processus et titre de fenêtre, ou null si indéterminé.
+    /// Utilisé par le suivi d'activité.
+    /// </summary>
+    (string App, string? Title)? GetForegroundApp();
 }

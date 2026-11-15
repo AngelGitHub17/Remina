@@ -73,6 +73,18 @@ public class EnrollmentCode
         && (ExpiresAt is null || ExpiresAt > now);
 }
 
+/// <summary>Agrégat d'activité : temps passé par un poste sur une appli un jour donné.</summary>
+public class ActivityAggregate
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid MachineId { get; set; }
+    public Machine? Machine { get; set; }
+    public DateOnly Day { get; set; }
+    public string App { get; set; } = "";
+    public string Title { get; set; } = ""; // "" quand la capture des titres est désactivée
+    public int Seconds { get; set; }
+}
+
 /// <summary>Commande en attente de récupération par un agent.</summary>
 public class AgentCommandRecord
 {

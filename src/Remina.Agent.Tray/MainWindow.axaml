@@ -29,6 +29,17 @@
         <TextBlock Grid.Row="4" Grid.Column="1" Classes="value" x:Name="RdpText" Text="—"/>
       </Grid>
 
+      <Border Background="#171a21" CornerRadius="8" Padding="12">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" VerticalAlignment="Center">
+            <TextBlock Text="Suivi d'activité" Foreground="#e6e8ee" FontWeight="SemiBold"/>
+            <TextBlock x:Name="ActivityText" Classes="label" Text="—"/>
+          </StackPanel>
+          <ToggleButton Grid.Column="1" x:Name="PrivateToggle" Content="Mode privé"
+                        Click="OnTogglePrivate" VerticalAlignment="Center"/>
+        </Grid>
+      </Border>
+
       <TextBlock x:Name="ErrorText" Foreground="#ef4444" FontSize="12" TextWrapping="Wrap"/>
 
       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">

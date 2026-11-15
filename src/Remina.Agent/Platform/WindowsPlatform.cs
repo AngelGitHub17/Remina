@@ -63,6 +63,29 @@ public sealed class WindowsPlatform : PlatformBase
         catch { return null; }
     }
 
+    public override (string App, string? Title)? GetForegroundApp()
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        try
+        {
+            var hwnd = GetForegroundWindow();
+            if (hwnd == IntPtr.Zero) return null;
+
+            GetWindowThreadProcessId(hwnd, out var pid);
+            if (pid == 0) return null;
+
+            string app;
+            try { using var p = Process.GetProcessById((int)pid); app = p.ProcessName; }
+            catch { return null; }
+
+            var sb = new System.Text.StringBuilder(512);
+            GetWindowText(hwnd, sb, sb.Capacity);
+            var title = sb.ToString();
+            return (app, string.IsNullOrWhiteSpace(title) ? null : title);
+        }
+        catch { return null; }
+    }
+
     private const int SM_REMOTESESSION = 0x1000;
 
     [SupportedOSPlatform("windows")]
@@ -75,4 +98,16 @@ public sealed class WindowsPlatform : PlatformBase
     [SupportedOSPlatform("windows")]
     [DllImport("user32.dll")]
     private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+    [SupportedOSPlatform("windows")]
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [SupportedOSPlatform("windows")]
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [SupportedOSPlatform("windows")]
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int count);
 }

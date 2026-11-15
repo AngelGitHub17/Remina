@@ -10,6 +10,7 @@ public class ReminaDbContext : DbContext
     public DbSet<Bureau> Bureaus => Set<Bureau>();
     public DbSet<EnrollmentCode> EnrollmentCodes => Set<EnrollmentCode>();
     public DbSet<AgentCommandRecord> AgentCommands => Set<AgentCommandRecord>();
+    public DbSet<ActivityAggregate> Activity => Set<ActivityAggregate>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -36,6 +37,14 @@ public class ReminaDbContext : DbContext
         b.Entity<EnrollmentCode>(e =>
         {
             e.HasIndex(c => c.Code).IsUnique();
+        });
+
+        b.Entity<ActivityAggregate>(e =>
+        {
+            // Une ligne par (poste, jour, appli, titre) : on y cumule les secondes.
+            e.HasIndex(a => new { a.MachineId, a.Day, a.App, a.Title }).IsUnique();
+            e.HasOne(a => a.Machine).WithMany()
+             .HasForeignKey(a => a.MachineId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

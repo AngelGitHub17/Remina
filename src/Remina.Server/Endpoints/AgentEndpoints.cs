@@ -113,6 +113,36 @@ public static class AgentEndpoints
                 }).ToList(),
             });
         });
+
+        // Rapport d'activité : cumule les secondes par (jour, appli, titre). Jeton d'agent requis.
+        g.MapPost("/activity", async (ActivityReport report, HttpContext http, ReminaDbContext db) =>
+        {
+            var token = http.Request.Headers["X-Agent-Token"].ToString();
+            if (string.IsNullOrEmpty(token)) return Results.Unauthorized();
+
+            var machine = await db.Machines.FirstOrDefaultAsync(m => m.Id == report.MachineId);
+            if (machine is null || !TokenService.Verify(token, machine.AgentTokenHash))
+                return Results.Unauthorized();
+
+            foreach (var entry in report.Entries)
+            {
+                if (string.IsNullOrWhiteSpace(entry.App) || entry.Seconds <= 0) continue;
+                var title = entry.Title ?? "";
+                var agg = await db.Activity.FirstOrDefaultAsync(a =>
+                    a.MachineId == report.MachineId && a.Day == entry.Day &&
+                    a.App == entry.App && a.Title == title);
+                if (agg is null)
+                    db.Activity.Add(new ActivityAggregate
+                    {
+                        MachineId = report.MachineId, Day = entry.Day,
+                        App = entry.App, Title = title, Seconds = entry.Seconds,
+                    });
+                else
+                    agg.Seconds += entry.Seconds;
+            }
+            await db.SaveChangesAsync();
+            return Results.Ok();
+        });
     }
 
     private static void ApplyInventory(Machine m, MachineInventory inv)

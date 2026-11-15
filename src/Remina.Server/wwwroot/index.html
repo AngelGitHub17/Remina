@@ -67,6 +67,7 @@
   <nav>
     <button data-tab="machines" class="active" onclick="tab('machines')">Postes</button>
     <button data-tab="bureaus" onclick="tab('bureaus')">Bureaux</button>
+    <button data-tab="activity" onclick="tab('activity')">Activité</button>
     <button data-tab="codes" onclick="tab('codes')">Codes d'inscription</button>
   </nav>
   <main>
@@ -96,6 +97,21 @@
         <table>
           <thead><tr><th>Nom</th><th>Emplacement</th><th>Description</th><th>Postes</th></tr></thead>
           <tbody id="bureausBody"><tr><td colspan="4" class="muted">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-activity" class="hide">
+      <div class="card">
+        <h2>Activité d'un poste</h2>
+        <div class="row">
+          <select id="actMachine" onchange="loadActivity()"></select>
+          <input id="actDay" type="date" onchange="loadActivity()">
+          <button class="sec" onclick="loadActivity()">Afficher</button>
+        </div>
+        <table style="margin-top:12px">
+          <thead><tr><th>Application</th><th>Temps</th><th>Part</th></tr></thead>
+          <tbody id="activityBody"><tr><td colspan="3" class="muted">Choisis un poste.</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -154,7 +170,35 @@ function logout(){
 }
 function tab(name){
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active", b.dataset.tab===name));
-  ["machines","bureaus","codes"].forEach(n=>document.getElementById("tab-"+n).classList.toggle("hide", n!==name));
+  ["machines","bureaus","activity","codes"].forEach(n=>document.getElementById("tab-"+n).classList.toggle("hide", n!==name));
+  if(name==="activity") fillActivityMachines();
+}
+
+function fmtDur(sec){
+  const h=Math.floor(sec/3600), m=Math.round((sec%3600)/60);
+  if(h>0) return h+" h "+(m<10?"0":"")+m;
+  return m+" min";
+}
+function fillActivityMachines(){
+  const sel=document.getElementById("actMachine");
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— Choisir un poste —</option>'+
+    State.machines.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
+  if(cur) sel.value=cur;
+  if(!document.getElementById("actDay").value)
+    document.getElementById("actDay").value=new Date().toLocaleDateString('en-CA');
+}
+async function loadActivity(){
+  const id=document.getElementById("actMachine").value;
+  const day=document.getElementById("actDay").value;
+  const body=document.getElementById("activityBody");
+  if(!id){ body.innerHTML='<tr><td colspan="3" class="muted">Choisis un poste.</td></tr>'; return; }
+  try {
+    const r=await api(`/api/admin/machines/${id}/activity`+(day?`?day=${day}`:""));
+    if(!r.apps.length){ body.innerHTML='<tr><td colspan="3" class="muted">Aucune activité ce jour.</td></tr>'; return; }
+    const total=r.apps.reduce((s,a)=>s+a.seconds,0)||1;
+    body.innerHTML=r.apps.map(a=>`<tr><td>${esc(a.app)}</td><td>${fmtDur(a.seconds)}</td><td class="muted">${Math.round(a.seconds*100/total)} %</td></tr>`).join("");
+  } catch(e){ toast(e.message, true); }
 }
 
 async function refresh(){

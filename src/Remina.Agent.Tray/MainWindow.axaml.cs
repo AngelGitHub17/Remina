@@ -45,6 +45,19 @@ public partial class MainWindow : Window
         StateText.Text = online ? "en ligne" : (_status.Enrolled ? "hors ligne" : "en attente d'inscription");
         StatusDot.Fill = new SolidColorBrush(online ? Color.Parse("#3ecf8e") : Color.Parse("#6b7280"));
         ErrorText.Text = _status.LastError ?? "";
+
+        if (!_status.ActivityEnabled) ActivityText.Text = "désactivé";
+        else if (_status.PrivateMode) ActivityText.Text = "en pause (mode privé)";
+        else ActivityText.Text = "actif";
+        PrivateToggle.IsChecked = _status.PrivateMode;
+        PrivateToggle.IsEnabled = _status.ActivityEnabled;
+    }
+
+    private void OnTogglePrivate(object? sender, RoutedEventArgs e)
+    {
+        if (_status is null) return;
+        _status.PrivateMode = PrivateToggle.IsChecked ?? false;
+        _status.NotifyChanged();
     }
 
     private void OnHide(object? sender, RoutedEventArgs e) => Hide();

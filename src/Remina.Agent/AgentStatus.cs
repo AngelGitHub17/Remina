@@ -16,6 +16,11 @@ public class AgentStatus
     public bool RemoteSessionActive { get; set; }
     public string? LastError { get; set; }
 
+    /// <summary>Suivi d'activité activé (config).</summary>
+    public bool ActivityEnabled { get; set; }
+    /// <summary>Mode privé : met en pause le suivi d'activité (basculable depuis l'UI).</summary>
+    public bool PrivateMode { get; set; }
+
     public bool Online =>
         LastHeartbeatOk is not null &&
         DateTimeOffset.UtcNow - LastHeartbeatOk < TimeSpan.FromMinutes(1);

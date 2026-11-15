@@ -58,6 +58,11 @@ public class AgentWorker : BackgroundService
             _cfg.GetValue("Remina:IdleMinutes", 5));
         int nextDelay = 30;
 
+        // Suivi d'activité : boucle dédiée (échantillonnage court, envoi périodique).
+        _status.ActivityEnabled = _cfg.GetValue("Remina:Activity:Enabled", true);
+        if (_status.ActivityEnabled)
+            _ = Task.Run(() => ActivityLoopAsync(idleThreshold, ct), ct);
+
         var updateEnabled = _cfg.GetValue("Remina:Update:Enabled", true);
         var updateEvery = TimeSpan.FromHours(_cfg.GetValue("Remina:Update:CheckHours", 6));
         var nextUpdateCheck = DateTimeOffset.UtcNow.AddMinutes(1); // première vérif après 1 min
@@ -178,6 +183,41 @@ public class AgentWorker : BackgroundService
         ?? (OperatingSystem.IsWindows() ? "ReminaAgent"
             : OperatingSystem.IsLinux() ? "remina-agent"
             : OperatingSystem.IsMacOS() ? "fr.nounourscorp.remina.agent" : null);
+
+    /// <summary>
+    /// Échantillonne l'appli au premier plan et envoie les cumuls au serveur.
+    /// Rien n'est mesuré pendant l'inactivité ni en mode privé.
+    /// </summary>
+    private async Task ActivityLoopAsync(TimeSpan idleThreshold, CancellationToken ct)
+    {
+        var sampleSeconds = Math.Max(5, _cfg.GetValue("Remina:Activity:SampleSeconds", 15));
+        var uploadEvery = TimeSpan.FromMinutes(_cfg.GetValue("Remina:Activity:UploadMinutes", 2));
+        var captureTitles = _cfg.GetValue("Remina:Activity:CaptureTitles", false);
+        var sampler = new ActivitySampler(_platform, captureTitles);
+        var nextUpload = DateTimeOffset.UtcNow + uploadEvery;
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                var active = !_status.PrivateMode && !_platform.IsUserIdle(idleThreshold);
+                if (active) sampler.Sample(sampleSeconds);
+
+                if (DateTimeOffset.UtcNow >= nextUpload && sampler.HasData && _state.IsEnrolled)
+                {
+                    nextUpload = DateTimeOffset.UtcNow + uploadEvery;
+                    var report = new ActivityReport { MachineId = _state.MachineId, Entries = sampler.Drain() };
+                    await _client.PostActivityAsync(_state.AgentToken, report, ct);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _log.LogWarning(ex, "Suivi d'activité : échec d'un cycle.");
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(sampleSeconds), ct);
+        }
+    }
 
     private async Task ConnectHubAsync(CancellationToken ct)
     {

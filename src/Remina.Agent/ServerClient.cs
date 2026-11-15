@@ -41,6 +41,18 @@ public class ServerClient
         return await resp.Content.ReadFromJsonAsync<UpdateCheckResult>(ct);
     }
 
+    /// <summary>Envoie un rapport d'activité (cumuls depuis le dernier envoi).</summary>
+    public async Task<bool> PostActivityAsync(string token, ActivityReport report, CancellationToken ct)
+    {
+        using var msg = new HttpRequestMessage(HttpMethod.Post, "/api/agent/activity")
+        {
+            Content = JsonContent.Create(report),
+        };
+        msg.Headers.Add("X-Agent-Token", token);
+        var resp = await _http.SendAsync(msg, ct);
+        return resp.IsSuccessStatusCode;
+    }
+
     /// <summary>HttpClient dédié aux téléchargements (timeout long).</summary>
     public static HttpClient DownloadClient() => new() { Timeout = TimeSpan.FromMinutes(5) };
 }
