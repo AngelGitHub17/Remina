@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Remina.Server.Data;
+using Remina.Server.Hubs;
 using Remina.Server.Services;
 using Remina.Shared;
 
@@ -135,7 +137,8 @@ public static class AdminEndpoints
 
         // Met une commande en file pour un poste (verrouiller, redémarrer, ticket, message...).
         g.MapPost("/machines/{id:guid}/commands", async (
-            Guid id, QueueCommandDto dto, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+            Guid id, QueueCommandDto dto, HttpContext http, IConfiguration cfg,
+            ReminaDbContext db, IHubContext<AgentHub> hub) =>
         {
             if (!IsAdmin(http, cfg)) return Results.Unauthorized();
 
@@ -150,6 +153,15 @@ public static class AdminEndpoints
             };
             db.AgentCommands.Add(cmd);
             await db.SaveChangesAsync();
+
+            // Push temps réel : l'agent connecté reçoit l'ordre immédiatement.
+            // Reste en file : le heartbeat sert de filet si l'agent n'est pas connecté au hub.
+            await hub.Clients.Group(id.ToString()).SendAsync("command", new AgentCommand
+            {
+                CommandId = cmd.Id,
+                Type = cmd.Type,
+                Payload = cmd.Payload,
+            });
 
             return Results.Ok(new { cmd.Id, cmd.Type, cmd.Payload, cmd.CreatedAt });
         });

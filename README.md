@@ -61,6 +61,17 @@ Remina.Server.exe
 Remina.Agent.exe
 ```
 
+## Temps réel
+
+Les commandes sont **poussées** à l'agent via SignalR (`/hubs/agent`) dès le clic, sans
+attendre le heartbeat. L'agent se connecte avec son `machineId` + jeton, rejoint son
+groupe, et reçoit les ordres immédiatement ; le heartbeat (toutes les 30 s) reste le filet
+de sécurité, avec déduplication des commandes.
+
+> Derrière un reverse proxy (Nginx Proxy Manager, Caddy…), active le support **WebSockets**
+> sur l'hôte du serveur Remina, sinon SignalR bascule en long-polling (fonctionne, mais
+> moins efficace).
+
 ## Console web
 
 Le serveur sert une console d'administration à sa racine (`http://SERVER:5080/`) :

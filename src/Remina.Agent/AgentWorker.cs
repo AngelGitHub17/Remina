@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.SignalR.Client;
 using Remina.Agent.Platform;
 using Remina.Shared;
 
@@ -14,6 +15,9 @@ public class AgentWorker : BackgroundService
     private readonly IPlatform _platform;
     private readonly ServerClient _client;
     private readonly AgentStatus _status;
+    private readonly string _serverUrl;
+    private readonly HashSet<Guid> _handled = new();
+    private HubConnection? _hub;
     private AgentState _state;
 
     public AgentWorker(ILogger<AgentWorker> log, IConfiguration cfg, AgentStatus status)
@@ -22,10 +26,10 @@ public class AgentWorker : BackgroundService
         _cfg = cfg;
         _status = status;
         _platform = PlatformFactory.Create();
-        var serverUrl = cfg["Remina:ServerUrl"] ?? "http://localhost:5080";
-        _client = new ServerClient(serverUrl);
+        _serverUrl = cfg["Remina:ServerUrl"] ?? "http://localhost:5080";
+        _client = new ServerClient(_serverUrl);
         _state = AgentState.Load() ?? new AgentState();
-        _status.ServerUrl = serverUrl;
+        _status.ServerUrl = _serverUrl;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -46,6 +50,9 @@ public class AgentWorker : BackgroundService
             _log.LogWarning("Inscription impossible (code ou serveur). Nouvelle tentative dans 30 s.");
             await Task.Delay(TimeSpan.FromSeconds(30), ct);
         }
+
+        // Connexion temps réel : commandes poussées sans attendre le heartbeat.
+        await ConnectHubAsync(ct);
 
         var idleThreshold = TimeSpan.FromMinutes(
             _cfg.GetValue("Remina:IdleMinutes", 5));
@@ -84,7 +91,7 @@ public class AgentWorker : BackgroundService
                     _status.LastError = null;
                     _status.NotifyChanged();
                     foreach (var cmd in resp.Commands)
-                        HandleCommand(cmd, remote);
+                        Dispatch(cmd);
                 }
                 else
                 {
@@ -171,6 +178,33 @@ public class AgentWorker : BackgroundService
         ?? (OperatingSystem.IsWindows() ? "ReminaAgent"
             : OperatingSystem.IsLinux() ? "remina-agent"
             : OperatingSystem.IsMacOS() ? "fr.nounourscorp.remina.agent" : null);
+
+    private async Task ConnectHubAsync(CancellationToken ct)
+    {
+        try
+        {
+            var url = _serverUrl.TrimEnd('/') +
+                $"/hubs/agent?machineId={_state.MachineId}&token={Uri.EscapeDataString(_state.AgentToken)}";
+            _hub = new HubConnectionBuilder().WithUrl(url).WithAutomaticReconnect().Build();
+            _hub.On<AgentCommand>("command", Dispatch);
+            await _hub.StartAsync(ct);
+            _log.LogInformation("Connecté au serveur en temps réel.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _log.LogWarning(ex, "Temps réel indisponible, le heartbeat prend le relais.");
+        }
+    }
+
+    /// <summary>Exécute une commande en évitant les doublons (push temps réel + heartbeat).</summary>
+    private void Dispatch(AgentCommand cmd)
+    {
+        lock (_handled)
+        {
+            if (!_handled.Add(cmd.CommandId)) return;
+        }
+        HandleCommand(cmd, _platform.IsRemoteSessionActive());
+    }
 
     private void HandleCommand(AgentCommand cmd, bool remoteSessionActive)
     {
