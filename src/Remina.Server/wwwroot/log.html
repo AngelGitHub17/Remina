@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Remina — Saisie de temps</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --txt:#e6e8ee;
+    --muted:#9aa3b2; --accent:#5b8cff; --ok:#3ecf8e; --danger:#ef4444; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font:16px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); padding:16px; }
+  h1 { font-size:18px; margin:4px 0 16px; }
+  label { display:block; color:var(--muted); font-size:13px; margin:12px 0 4px; }
+  input, button { width:100%; font:inherit; color:var(--txt); background:var(--panel2);
+    border:1px solid var(--line); border-radius:12px; padding:13px 14px; }
+  .row { display:flex; gap:10px; } .row > * { flex:1; }
+  button { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; margin-top:18px; }
+  button.sec { background:var(--panel2); color:var(--txt); border-color:var(--line); font-weight:500; margin-top:8px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:16px; }
+  .dur { color:var(--accent); font-weight:600; text-align:center; margin-top:10px; }
+  .entry { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line); }
+  .entry b { font-weight:600; } .entry small { color:var(--muted); display:block; }
+  .total { text-align:right; color:var(--muted); margin-top:10px; }
+  .msg { text-align:center; padding:8px; border-radius:10px; margin-top:10px; }
+  .msg.ok { background:rgba(62,207,142,.15); color:var(--ok); }
+  .msg.err { background:rgba(239,68,68,.15); color:var(--danger); }
+  .hide { display:none; }
+</style>
+</head>
+<body>
+
+<div id="gate" class="card">
+  <h1>Remina — Saisie de temps</h1>
+  <label>Clé d'administration</label>
+  <input id="key" type="password" placeholder="X-Admin-Key">
+  <button onclick="enter()">Entrer</button>
+  <div id="gateMsg" class="msg err hide"></div>
+</div>
+
+<div id="app" class="hide">
+  <div class="card">
+    <h1>Nouvelle entrée</h1>
+    <label>Projet</label>
+    <input id="project" placeholder="Rémina" list="projects">
+    <datalist id="projects"></datalist>
+    <label>Date</label>
+    <input id="date" type="date">
+    <div class="row">
+      <div><label>Début</label><input id="start" type="time"></div>
+      <div><label>Fin</label><input id="end" type="time"></div>
+    </div>
+    <div id="dur" class="dur"></div>
+    <label>Note (optionnel)</label>
+    <input id="note" placeholder="ce que tu as fait">
+    <button onclick="submit()">Enregistrer</button>
+    <button class="sec" onclick="fillNow()">Fin = maintenant</button>
+    <div id="msg" class="msg hide"></div>
+  </div>
+
+  <div class="card">
+    <h1>Aujourd'hui</h1>
+    <div id="list"></div>
+    <div id="total" class="total"></div>
+  </div>
+</div>
+
+<script>
+let KEY="";
+const $=id=>document.getElementById(id);
+
+function enter(){
+  KEY=$("key").value.trim(); if(!KEY) return;
+  api("/api/admin/time-entries").then(()=>{
+    sessionStorage.setItem("rk",KEY);
+    $("gate").classList.add("hide"); $("app").classList.remove("hide");
+    initDates(); load();
+  }).catch(()=>{ $("gateMsg").textContent="Clé refusée."; $("gateMsg").classList.remove("hide"); });
+}
+async function api(path, opts={}){
+  opts.headers=Object.assign({"X-Admin-Key":KEY,"Content-Type":"application/json"}, opts.headers||{});
+  const r=await fetch(path,opts); if(!r.ok) throw new Error("HTTP "+r.status);
+  return r.status===204?null:r.json();
+}
+function initDates(){
+  const now=new Date();
+  $("date").value=now.toLocaleDateString('en-CA');
+  updateDur();
+}
+function fillNow(){ $("end").value=new Date().toTimeString().slice(0,5); updateDur(); }
+function iso(date,time){ return new Date(date+"T"+time).toISOString(); }
+function updateDur(){
+  const d=$("date").value, s=$("start").value, e=$("end").value;
+  if(!d||!s||!e){ $("dur").textContent=""; return; }
+  let mins=(new Date(d+"T"+e)-new Date(d+"T"+s))/60000;
+  if(mins<0) mins+=1440; // passe minuit
+  const h=Math.floor(mins/60), m=Math.round(mins%60);
+  $("dur").textContent = mins>0 ? `${h} h ${m<10?'0':''}${m} min` : "";
+}
+["date","start","end"].forEach(id=>document.addEventListener("input",ev=>{ if(ev.target.id===id) updateDur(); }));
+
+async function submit(){
+  const d=$("date").value, s=$("start").value, e=$("end").value;
+  if(!$("project").value.trim()||!d||!s||!e){ return flash("Projet, date, début et fin requis.",true); }
+  let endIso=iso(d,e);
+  if(new Date(d+"T"+e) < new Date(d+"T"+s)){ // passe minuit → fin le lendemain
+    const nd=new Date(d); nd.setDate(nd.getDate()+1);
+    endIso=iso(nd.toLocaleDateString('en-CA'),e);
+  }
+  try{
+    await api("/api/admin/time-entries",{method:"POST",body:JSON.stringify({
+      project:$("project").value.trim(), start:iso(d,s), end:endIso,
+      note:$("note").value.trim()||null, source:"téléphone" })});
+    $("note").value=""; flash("Enregistré.",false); load();
+  }catch(err){ flash(err.message,true); }
+}
+function flash(t,err){ const m=$("msg"); m.textContent=t; m.className="msg "+(err?"err":"ok"); setTimeout(()=>m.classList.add("hide"),2500); }
+
+async function load(){
+  const today=new Date().toLocaleDateString('en-CA');
+  const r=await api(`/api/admin/time-entries?from=${today}T00:00:00&to=${today}T23:59:59`);
+  const projects=[...new Set(r.entries.map(e=>e.project))];
+  $("projects").innerHTML=projects.map(p=>`<option value="${p}">`).join("");
+  $("list").innerHTML=r.entries.length? r.entries.map(e=>{
+    const hh=m=>`${Math.floor(m/60)} h ${(m%60)<10?'0':''}${m%60}`;
+    const t=x=>new Date(x).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    return `<div class="entry"><div><b>${esc(e.project)}</b><small>${t(e.start)} → ${t(e.end)}${e.note?' · '+esc(e.note):''}</small></div><div>${hh(e.minutes)}</div></div>`;
+  }).join("") : '<div style="color:var(--muted)">Aucune entrée aujourd\'hui.</div>';
+  const tm=r.totalMinutes;
+  $("total").textContent="Total : "+Math.floor(tm/60)+" h "+((tm%60)<10?'0':'')+(tm%60)+" min";
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+window.addEventListener("load",()=>{ const k=sessionStorage.getItem("rk"); if(k){ $("key").value=k; enter(); } });
+</script>
+</body>
+</html>

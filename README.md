@@ -72,6 +72,16 @@ de sécurité, avec déduplication des commandes.
 > sur l'hôte du serveur Remina, sinon SignalR bascule en long-polling (fonctionne, mais
 > moins efficace).
 
+## Saisie de temps (récap) et page mobile
+
+Au-delà du suivi automatique, on peut saisir du temps à la main pour le récapitulatif
+(« travaillé sur Rémina de 14:00 à 16:30 ») :
+
+- **Page mobile** `http://SERVER:5080/log.html` — pensée pour le téléphone : projet, date,
+  début/fin (bouton « Fin = maintenant »), note. Elle calcule la durée et liste la journée.
+- **Console** : onglet *Récap* — ajout, filtrage par période, total, suppression.
+- API : `POST/GET/DELETE /api/admin/time-entries` (clé admin).
+
 ## Console web
 
 Le serveur sert une console d'administration à sa racine (`http://SERVER:5080/`) :

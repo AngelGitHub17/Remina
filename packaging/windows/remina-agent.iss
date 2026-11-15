@@ -27,6 +27,18 @@ Source: "..\..\out\agent\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversi
 var
   ServerPage: TInputQueryWizardPage;
 
+// Vrai si un poste est déjà inscrit (état écrit après la première inscription).
+function IsEnrolled(): Boolean;
+begin
+  Result := FileExists(ExpandConstant('{commonappdata}\Remina\remina-agent.json'));
+end;
+
+// Sur une mise à jour d'un poste déjà inscrit : on ne redemande pas le code.
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (ServerPage <> nil) and (PageID = ServerPage.ID) and IsEnrolled();
+end;
+
 procedure InitializeWizard;
 begin
   // Demande l'URL du serveur et le code d'inscription à l'installation.
@@ -43,7 +55,8 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   cfg: string;
 begin
-  if CurStep = ssPostInstall then
+  // On n'écrit la config que lors d'une première installation (poste non inscrit).
+  if (CurStep = ssPostInstall) and (not IsEnrolled()) then
   begin
     // Écrit un appsettings.json minimal avec les réponses de l'utilisateur.
     cfg :=

@@ -68,6 +68,7 @@
     <button data-tab="machines" class="active" onclick="tab('machines')">Postes</button>
     <button data-tab="bureaus" onclick="tab('bureaus')">Bureaux</button>
     <button data-tab="activity" onclick="tab('activity')">Activité</button>
+    <button data-tab="recap" onclick="tab('recap')">Récap</button>
     <button data-tab="codes" onclick="tab('codes')">Codes d'inscription</button>
   </nav>
   <main>
@@ -112,6 +113,35 @@
         <table style="margin-top:12px">
           <thead><tr><th>Application</th><th>Temps</th><th>Part</th></tr></thead>
           <tbody id="activityBody"><tr><td colspan="3" class="muted">Choisis un poste.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-recap" class="hide">
+      <div class="card">
+        <h2>Ajouter du temps</h2>
+        <div class="row">
+          <input id="teProject" placeholder="Projet (ex : Rémina)">
+          <input id="teDate" type="date">
+          <input id="teStart" type="time" title="Début">
+          <input id="teEnd" type="time" title="Fin">
+          <input id="teNote" placeholder="Note (optionnel)" style="flex:1">
+          <button onclick="addEntry()">Ajouter</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Entrées de temps</h2>
+        <div class="row" style="margin-bottom:10px">
+          <label class="muted" style="align-self:center">Du</label>
+          <input id="teFrom" type="date">
+          <label class="muted" style="align-self:center">au</label>
+          <input id="teTo" type="date">
+          <button class="sec" onclick="loadRecap()">Filtrer</button>
+          <span id="teTotal" class="tag" style="align-self:center"></span>
+        </div>
+        <table>
+          <thead><tr><th>Projet</th><th>Début</th><th>Fin</th><th>Durée</th><th>Source</th><th>Note</th><th></th></tr></thead>
+          <tbody id="recapBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -170,8 +200,51 @@ function logout(){
 }
 function tab(name){
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active", b.dataset.tab===name));
-  ["machines","bureaus","activity","codes"].forEach(n=>document.getElementById("tab-"+n).classList.toggle("hide", n!==name));
+  ["machines","bureaus","activity","recap","codes"].forEach(n=>document.getElementById("tab-"+n).classList.toggle("hide", n!==name));
   if(name==="activity") fillActivityMachines();
+  if(name==="recap") initRecap();
+}
+
+function dur(min){ const h=Math.floor(min/60), m=min%60; return (h>0?h+" h ":"")+(m<10&&h>0?"0":"")+m+" min"; }
+function initRecap(){
+  const today=new Date().toLocaleDateString('en-CA');
+  if(!document.getElementById("teDate").value) document.getElementById("teDate").value=today;
+  if(!document.getElementById("teFrom").value) document.getElementById("teFrom").value=today;
+  if(!document.getElementById("teTo").value) document.getElementById("teTo").value=today;
+  loadRecap();
+}
+async function addEntry(){
+  const d=document.getElementById("teDate").value, s=document.getElementById("teStart").value, e=document.getElementById("teEnd").value;
+  if(!document.getElementById("teProject").value.trim()||!d||!s||!e) return toast("Projet, date, début et fin requis.", true);
+  let endD=d;
+  if(new Date(d+"T"+e)<new Date(d+"T"+s)){ const nd=new Date(d); nd.setDate(nd.getDate()+1); endD=nd.toLocaleDateString('en-CA'); }
+  try {
+    await api("/api/admin/time-entries",{method:"POST",body:JSON.stringify({
+      project:document.getElementById("teProject").value.trim(),
+      start:new Date(d+"T"+s).toISOString(), end:new Date(endD+"T"+e).toISOString(),
+      note:document.getElementById("teNote").value.trim()||null, source:"manuel" })});
+    document.getElementById("teNote").value="";
+    toast("Entrée ajoutée."); loadRecap();
+  } catch(err){ toast(err.message, true); }
+}
+async function loadRecap(){
+  const f=document.getElementById("teFrom").value, t=document.getElementById("teTo").value;
+  const qs=[]; if(f) qs.push("from="+f+"T00:00:00"); if(t) qs.push("to="+t+"T23:59:59");
+  const body=document.getElementById("recapBody");
+  try {
+    const r=await api("/api/admin/time-entries"+(qs.length?"?"+qs.join("&"):""));
+    document.getElementById("teTotal").textContent="Total : "+dur(r.totalMinutes);
+    const tm=x=>new Date(x).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    body.innerHTML = r.entries.length ? r.entries.map(e=>`
+      <tr><td>${esc(e.project)}</td><td class="muted">${tm(e.start)}</td><td class="muted">${tm(e.end)}</td>
+      <td>${dur(e.minutes)}</td><td><span class="tag">${esc(e.source)}</span></td><td class="muted">${esc(e.note||'')}</td>
+      <td><button class="sec" onclick="delEntry('${e.id}')">✕</button></td></tr>`).join("")
+      : '<tr><td colspan="7" class="muted">Aucune entrée sur la période.</td></tr>';
+  } catch(err){ toast(err.message, true); }
+}
+async function delEntry(id){
+  try { await api("/api/admin/time-entries/"+id,{method:"DELETE"}); toast("Entrée supprimée."); loadRecap(); }
+  catch(e){ toast(e.message, true); }
 }
 
 function fmtDur(sec){
@@ -234,6 +307,7 @@ function renderMachines(){
         <button class="sec" onclick="cmd('${m.id}',${CMD.Reboot})">Redémarrer</button>
         <button class="sec" onclick="msgCmd('${m.id}')">Message</button>
         <button class="sec" onclick="cmd('${m.id}',${CMD.PrintSummaryTicket})">Ticket</button>
+        <button class="sec" onclick="delMachine('${m.id}','${esc(m.name)}')" title="Supprimer le poste">✕</button>
       </td>
     </tr>`).join("");
 }
@@ -269,6 +343,11 @@ async function cmd(id, type, payload=null){
     toast("Commande envoyée."); } catch(e){ toast(e.message, true); }
 }
 function msgCmd(id){ const t=prompt("Message à afficher sur le poste :"); if(t) cmd(id, CMD.ShowMessage, t); }
+async function delMachine(id, name){
+  if(!confirm(`Supprimer le poste « ${name} » et son activité ?`)) return;
+  try { await api("/api/admin/machines/"+id,{method:"DELETE"}); toast("Poste supprimé."); refresh(); }
+  catch(e){ toast(e.message, true); }
+}
 
 async function createCode(){
   try {

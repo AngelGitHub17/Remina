@@ -85,6 +85,24 @@ public class ActivityAggregate
     public int Seconds { get; set; }
 }
 
+/// <summary>
+/// Entrée de temps saisie à la main (ex : depuis le téléphone) pour le récapitulatif.
+/// « J'ai travaillé sur Rémina de 14:00 à 16:30 » → projet + début + fin.
+/// </summary>
+public class ManualTimeEntry
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Project { get; set; } = "";
+    public DateTimeOffset Start { get; set; }
+    public DateTimeOffset End { get; set; }
+    public string? Note { get; set; }
+    public string Source { get; set; } = "manuel";
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public int Minutes => (int)Math.Max(0, (End - Start).TotalMinutes);
+}
+
 /// <summary>Commande en attente de récupération par un agent.</summary>
 public class AgentCommandRecord
 {

@@ -38,6 +38,16 @@ Name: "{autoprograms}\Remina Agent"; Filename: "{app}\Remina.Agent.Tray.exe"
 var
   ServerPage: TInputQueryWizardPage;
 
+function IsEnrolled(): Boolean;
+begin
+  Result := FileExists(ExpandConstant('{commonappdata}\Remina\remina-agent.json'));
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (ServerPage <> nil) and (PageID = ServerPage.ID) and IsEnrolled();
+end;
+
 procedure InitializeWizard;
 begin
   ServerPage := CreateInputQueryPage(wpSelectDir,
@@ -52,7 +62,7 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var cfg: string;
 begin
-  if CurStep = ssPostInstall then
+  if (CurStep = ssPostInstall) and (not IsEnrolled()) then
   begin
     cfg :=
       '{' + #13#10 +

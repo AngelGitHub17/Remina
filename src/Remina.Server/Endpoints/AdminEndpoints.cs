@@ -97,6 +97,66 @@ public static class AdminEndpoints
             return Results.Ok(machines);
         });
 
+        // --- Suppression d'un poste (cascade : activité et commandes) ---
+        g.MapDelete("/machines/{id:guid}", async (
+            Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            var machine = await db.Machines.FindAsync(id);
+            if (machine is null) return Results.NotFound();
+            db.Machines.Remove(machine);
+            await db.SaveChangesAsync();
+            return Results.Ok();
+        });
+
+        // --- Entrées de temps manuelles (récap, saisie téléphone) ---
+        g.MapPost("/time-entries", async (
+            CreateTimeEntryDto dto, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            if (string.IsNullOrWhiteSpace(dto.Project)) return Results.BadRequest(new { error = "Projet requis." });
+            if (dto.End <= dto.Start) return Results.BadRequest(new { error = "La fin doit être après le début." });
+
+            var e = new ManualTimeEntry
+            {
+                Project = dto.Project.Trim(),
+                Start = dto.Start, End = dto.End,
+                Note = string.IsNullOrWhiteSpace(dto.Note) ? null : dto.Note.Trim(),
+                Source = string.IsNullOrWhiteSpace(dto.Source) ? "manuel" : dto.Source!.Trim(),
+            };
+            db.TimeEntries.Add(e);
+            await db.SaveChangesAsync();
+            return Results.Ok(new { e.Id, e.Project, e.Start, e.End, e.Minutes, e.Note, e.Source });
+        });
+
+        g.MapGet("/time-entries", async (
+            string? from, string? to, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+
+            // SQLite ne trie pas les DateTimeOffset : on matérialise puis filtre/trie en mémoire.
+            var all = await db.TimeEntries.ToListAsync();
+            if (DateTimeOffset.TryParse(from, out var f)) all = all.Where(e => e.End >= f).ToList();
+            if (DateTimeOffset.TryParse(to, out var t)) all = all.Where(e => e.Start <= t).ToList();
+
+            var entries = all.OrderByDescending(e => e.Start)
+                .Select(e => new { e.Id, e.Project, e.Start, e.End, e.Minutes, e.Note, e.Source })
+                .ToList();
+
+            return Results.Ok(new { totalMinutes = entries.Sum(e => e.Minutes), entries });
+        });
+
+        g.MapDelete("/time-entries/{id:guid}", async (
+            Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            var e = await db.TimeEntries.FindAsync(id);
+            if (e is null) return Results.NotFound();
+            db.TimeEntries.Remove(e);
+            await db.SaveChangesAsync();
+            return Results.Ok();
+        });
+
         // Activité d'un poste pour un jour donné (par défaut aujourd'hui), cumul par appli.
         g.MapGet("/machines/{id:guid}/activity", async (
             Guid id, string? day, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
@@ -198,4 +258,5 @@ public static class AdminEndpoints
     public record QueueCommandDto(AgentCommandType Type, string? Payload);
     public record CreateBureauDto(string Name, string? Description, string? Location);
     public record AssignBureauDto(Guid? BureauId);
+    public record CreateTimeEntryDto(string Project, DateTimeOffset Start, DateTimeOffset End, string? Note, string? Source);
 }

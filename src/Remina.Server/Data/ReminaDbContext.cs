@@ -11,6 +11,7 @@ public class ReminaDbContext : DbContext
     public DbSet<EnrollmentCode> EnrollmentCodes => Set<EnrollmentCode>();
     public DbSet<AgentCommandRecord> AgentCommands => Set<AgentCommandRecord>();
     public DbSet<ActivityAggregate> Activity => Set<ActivityAggregate>();
+    public DbSet<ManualTimeEntry> TimeEntries => Set<ManualTimeEntry>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
