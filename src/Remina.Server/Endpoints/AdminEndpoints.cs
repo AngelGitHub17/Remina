@@ -198,6 +198,43 @@ public static class AdminEndpoints
             return Results.Ok();
         });
 
+        // Ticket récapitulatif d'un jour : activité auto par poste + temps saisi manuellement.
+        g.MapGet("/recap", async (
+            string? day, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            var d = DateOnly.TryParse(day, out var p) ? p : DateOnly.FromDateTime(DateTime.Now);
+
+            var acts = await db.Activity.Where(a => a.Day == d).ToListAsync();
+            var ids = acts.Select(a => a.MachineId).Distinct().ToList();
+            var names = await db.Machines.Where(m => ids.Contains(m.Id))
+                .ToDictionaryAsync(m => m.Id, m => m.Name);
+
+            var machines = acts.GroupBy(a => a.MachineId).Select(g => new
+            {
+                name = names.GetValueOrDefault(g.Key, "?"),
+                totalSeconds = g.Sum(x => x.Seconds),
+                apps = g.GroupBy(x => x.App)
+                    .Select(ag => new { app = ag.Key, seconds = ag.Sum(x => x.Seconds) })
+                    .OrderByDescending(x => x.seconds).Take(10).ToList(),
+            }).OrderByDescending(m => m.totalSeconds).ToList();
+
+            var entries = (await db.TimeEntries.ToListAsync())
+                .Where(e => DateOnly.FromDateTime(e.Start.LocalDateTime) == d)
+                .OrderBy(e => e.Start)
+                .Select(e => new { e.Project, e.Start, e.End, e.Minutes, e.Note, e.Source })
+                .ToList();
+
+            return Results.Ok(new
+            {
+                day = d.ToString("yyyy-MM-dd"),
+                machines,
+                timeEntries = entries,
+                activityTotalSeconds = acts.Sum(a => a.Seconds),
+                manualTotalMinutes = entries.Sum(e => e.Minutes),
+            });
+        });
+
         // Activité d'un poste pour un jour donné (par défaut aujourd'hui), cumul par appli.
         g.MapGet("/machines/{id:guid}/activity", async (
             Guid id, string? day, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>

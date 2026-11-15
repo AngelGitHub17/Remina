@@ -141,6 +141,7 @@
           <label class="muted" style="align-self:center">au</label>
           <input id="teTo" type="date">
           <button class="sec" onclick="loadRecap()">Filtrer</button>
+          <button class="sec" onclick="openTicket()">🧾 Ticket imprimable</button>
           <span id="teTotal" class="tag" style="align-self:center"></span>
         </div>
         <table>
@@ -325,6 +326,10 @@ async function loadRecap(){
       <td><button class="sec" onclick="delEntry('${e.id}')">✕</button></td></tr>`).join("")
       : '<tr><td colspan="7" class="muted">Aucune entrée sur la période.</td></tr>';
   } catch(err){ toast(err.message, true); }
+}
+function openTicket(){
+  const day=document.getElementById("teFrom").value || new Date().toLocaleDateString('en-CA');
+  window.open("/recap.html?day="+day, "_blank");
 }
 async function delEntry(id){
   try { await api("/api/admin/time-entries/"+id,{method:"DELETE"}); toast("Entrée supprimée."); loadRecap(); }

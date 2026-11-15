@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Remina — Ticket récapitulatif</title>
+<style>
+  body { font:13px/1.5 system-ui,Segoe UI,Roboto,sans-serif; color:#111; background:#f3f4f6; margin:0; padding:20px; }
+  .sheet { background:#fff; max-width:760px; margin:0 auto; padding:32px 36px; box-shadow:0 2px 12px rgba(0,0,0,.1); }
+  h1 { font-size:20px; margin:0; } .sub { color:#666; margin:2px 0 20px; }
+  h2 { font-size:14px; text-transform:uppercase; letter-spacing:.5px; color:#555; border-bottom:2px solid #111; padding-bottom:4px; margin:22px 0 10px; }
+  table { width:100%; border-collapse:collapse; }
+  th,td { text-align:left; padding:5px 6px; border-bottom:1px solid #eee; }
+  th { color:#666; font-size:11px; text-transform:uppercase; }
+  .r { text-align:right; } .muted { color:#888; }
+  .tot { font-weight:700; } .machine { margin:14px 0; }
+  .machine h3 { font-size:13px; margin:0 0 4px; }
+  .foot { margin-top:26px; color:#999; font-size:11px; text-align:center; }
+  .bar { max-width:760px; margin:0 auto 14px; display:flex; gap:10px; align-items:center; }
+  input,button { font:inherit; padding:8px 10px; border:1px solid #ccc; border-radius:8px; }
+  button { background:#111; color:#fff; border-color:#111; cursor:pointer; }
+  @media print { body{background:#fff;padding:0} .sheet{box-shadow:none;max-width:none} .bar,.gate{display:none} }
+  .gate { max-width:360px; margin:16vh auto; background:#fff; padding:20px; border-radius:12px; }
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <h1>Ticket récapitulatif</h1>
+  <p class="muted">Clé d'administration :</p>
+  <input id="key" type="password" style="width:100%" placeholder="X-Admin-Key">
+  <button style="margin-top:10px;width:100%" onclick="enter()">Entrer</button>
+</div>
+
+<div id="app" style="display:none">
+  <div class="bar">
+    <label>Jour</label>
+    <input id="day" type="date" onchange="load()">
+    <button onclick="load()">Afficher</button>
+    <button onclick="window.print()">Imprimer</button>
+  </div>
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+let KEY="";
+const $=id=>document.getElementById(id);
+function enter(){ KEY=$("key").value.trim(); if(!KEY) return;
+  api("/api/admin/recap").then(()=>{ sessionStorage.setItem("rk",KEY);
+    $("gate").style.display="none"; $("app").style.display="block";
+    const u=new URLSearchParams(location.search);
+    $("day").value=u.get("day")||new Date().toLocaleDateString('en-CA'); load();
+  }).catch(()=>alert("Clé refusée."));
+}
+async function api(p){ const r=await fetch(p,{headers:{"X-Admin-Key":KEY}}); if(!r.ok) throw 0; return r.json(); }
+function dur(s){ const h=Math.floor(s/3600),m=Math.round((s%3600)/60); return (h>0?h+" h ":"")+(m<10&&h>0?"0":"")+m+" min"; }
+function durM(m){ const h=Math.floor(m/60); return (h>0?h+" h ":"")+(m%60<10&&h>0?"0":"")+(m%60)+" min"; }
+function t(x){ return new Date(x).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }
+function esc(s){ return String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+async function load(){
+  const day=$("day").value;
+  const r=await api("/api/admin/recap"+(day?"?day="+day:""));
+  const dateStr=new Date(r.day+"T12:00").toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  let html=`<h1>Ticket récapitulatif</h1><div class="sub">${dateStr}</div>`;
+
+  html+=`<h2>Temps saisi</h2>`;
+  if(r.timeEntries.length){
+    html+=`<table><thead><tr><th>Projet</th><th>Début</th><th>Fin</th><th class="r">Durée</th></tr></thead><tbody>`;
+    html+=r.timeEntries.map(e=>`<tr><td>${esc(e.project)}${e.note?' <span class="muted">· '+esc(e.note)+'</span>':''}</td><td>${t(e.start)}</td><td>${t(e.end)}</td><td class="r">${durM(e.minutes)}</td></tr>`).join("");
+    html+=`<tr class="tot"><td colspan="3">Total saisi</td><td class="r">${durM(r.manualTotalMinutes)}</td></tr></tbody></table>`;
+  } else html+=`<p class="muted">Aucune saisie.</p>`;
+
+  html+=`<h2>Activité des postes</h2>`;
+  if(r.machines.length){
+    r.machines.forEach(m=>{
+      html+=`<div class="machine"><h3>${esc(m.name)} — ${dur(m.totalSeconds)}</h3><table><tbody>`;
+      html+=m.apps.map(a=>`<tr><td>${esc(a.app)}</td><td class="r">${dur(a.seconds)}</td></tr>`).join("");
+      html+=`</tbody></table></div>`;
+    });
+    html+=`<p class="tot">Total activité : ${dur(r.activityTotalSeconds)}</p>`;
+  } else html+=`<p class="muted">Aucune activité enregistrée ce jour.</p>`;
+
+  html+=`<div class="foot">Remina — généré le ${new Date().toLocaleString('fr-FR')}</div>`;
+  $("sheet").innerHTML=html;
+}
+window.addEventListener("load",()=>{ const k=sessionStorage.getItem("rk"); if(k){ $("key").value=k; enter(); } });
+</script>
+</body>
+</html>

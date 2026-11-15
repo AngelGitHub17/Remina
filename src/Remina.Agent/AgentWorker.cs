@@ -26,9 +26,12 @@ public class AgentWorker : BackgroundService
         _cfg = cfg;
         _status = status;
         _platform = PlatformFactory.Create();
-        _serverUrl = cfg["Remina:ServerUrl"] ?? "http://localhost:5080";
-        _client = new ServerClient(_serverUrl);
         _state = AgentState.Load() ?? new AgentState();
+        // Priorité à l'URL mémorisée lors de l'inscription, sinon la config.
+        _serverUrl = !string.IsNullOrWhiteSpace(_state.ServerUrl)
+            ? _state.ServerUrl
+            : (cfg["Remina:ServerUrl"] ?? "http://localhost:5080");
+        _client = new ServerClient(_serverUrl);
         _status.ServerUrl = _serverUrl;
     }
 
@@ -150,6 +153,7 @@ public class AgentWorker : BackgroundService
             AgentToken = resp.AgentToken,
             MachineName = resp.MachineName,
             HardwareId = hwId,
+            ServerUrl = _serverUrl, // mémorise le serveur effectivement utilisé
         };
         try
         {

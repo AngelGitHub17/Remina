@@ -82,6 +82,13 @@ Au-delà du suivi automatique, on peut saisir du temps à la main pour le récap
 - **Console** : onglet *Récap* — ajout, filtrage par période, total, suppression.
 - API : `POST/GET/DELETE /api/admin/time-entries` (clé admin).
 
+## Ticket récapitulatif
+
+`http://SERVER:5080/recap.html?day=AAAA-MM-JJ` — page imprimable (A4) qui réunit, pour un
+jour : le **temps saisi** manuellement (par projet) et l'**activité automatique** par poste
+et par appli, avec les totaux. Bouton *Ticket imprimable* dans l'onglet *Récap* de la
+console. API : `GET /api/admin/recap?day=...`.
+
 ## Console web
 
 Le serveur sert une console d'administration à sa racine (`http://SERVER:5080/`) :

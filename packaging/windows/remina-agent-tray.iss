@@ -38,17 +38,23 @@ Name: "{autoprograms}\Remina Agent"; Filename: "{app}\Remina.Agent.Tray.exe"
 var
   ServerPage: TInputQueryWizardPage;
 
-function IsEnrolled(): Boolean;
+function ReadJsonStr(const FileName, Key: string): string;
+var s: AnsiString; p, q: Integer;
 begin
-  Result := FileExists(ExpandConstant('{commonappdata}\Remina\remina-agent.json'));
-end;
-
-function ShouldSkipPage(PageID: Integer): Boolean;
-begin
-  Result := (ServerPage <> nil) and (PageID = ServerPage.ID) and IsEnrolled();
+  Result := '';
+  if not LoadStringFromFile(FileName, s) then Exit;
+  p := Pos('"' + Key + '"', s); if p = 0 then Exit;
+  s := Copy(s, p + Length(Key) + 2, Length(s));
+  p := Pos(':', s); if p = 0 then Exit;
+  s := Copy(s, p + 1, Length(s));
+  p := Pos('"', s); if p = 0 then Exit;
+  s := Copy(s, p + 1, Length(s));
+  q := Pos('"', s); if q = 0 then Exit;
+  Result := Copy(s, 1, q - 1);
 end;
 
 procedure InitializeWizard;
+var existing, srv: string;
 begin
   ServerPage := CreateInputQueryPage(wpSelectDir,
     'Connexion au serveur Remina',
@@ -56,13 +62,17 @@ begin
     'Ces valeurs sont écrites dans la configuration de l''agent.');
   ServerPage.Add('URL du serveur (ex : http://192.168.1.10:5080) :', False);
   ServerPage.Add('Code d''inscription :', False);
-  ServerPage.Values[0] := 'http://localhost:5080';
+  existing := ExpandConstant('{app}\appsettings.json');
+  srv := ReadJsonStr(existing, 'ServerUrl');
+  if srv = '' then srv := 'http://localhost:5080';
+  ServerPage.Values[0] := srv;
+  ServerPage.Values[1] := ReadJsonStr(existing, 'EnrollmentCode');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var cfg: string;
 begin
-  if (CurStep = ssPostInstall) and (not IsEnrolled()) then
+  if CurStep = ssPostInstall then
   begin
     cfg :=
       '{' + #13#10 +

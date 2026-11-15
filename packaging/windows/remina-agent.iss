@@ -27,36 +27,45 @@ Source: "..\..\out\agent\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversi
 var
   ServerPage: TInputQueryWizardPage;
 
-// Vrai si un poste est déjà inscrit (état écrit après la première inscription).
-function IsEnrolled(): Boolean;
+// Extrait une valeur texte d'un JSON existant (pour pré-remplir).
+function ReadJsonStr(const FileName, Key: string): string;
+var s: AnsiString; p, q: Integer;
 begin
-  Result := FileExists(ExpandConstant('{commonappdata}\Remina\remina-agent.json'));
-end;
-
-// Sur une mise à jour d'un poste déjà inscrit : on ne redemande pas le code.
-function ShouldSkipPage(PageID: Integer): Boolean;
-begin
-  Result := (ServerPage <> nil) and (PageID = ServerPage.ID) and IsEnrolled();
+  Result := '';
+  if not LoadStringFromFile(FileName, s) then Exit;
+  p := Pos('"' + Key + '"', s); if p = 0 then Exit;
+  s := Copy(s, p + Length(Key) + 2, Length(s));
+  p := Pos(':', s); if p = 0 then Exit;
+  s := Copy(s, p + 1, Length(s));
+  p := Pos('"', s); if p = 0 then Exit;
+  s := Copy(s, p + 1, Length(s));
+  q := Pos('"', s); if q = 0 then Exit;
+  Result := Copy(s, 1, q - 1);
 end;
 
 procedure InitializeWizard;
+var existing, srv: string;
 begin
-  // Demande l'URL du serveur et le code d'inscription à l'installation.
   ServerPage := CreateInputQueryPage(wpSelectDir,
     'Connexion au serveur Remina',
     'Renseigne le serveur et le code d''inscription',
     'Ces valeurs sont écrites dans la configuration de l''agent.');
   ServerPage.Add('URL du serveur (ex : http://192.168.1.10:5080) :', False);
   ServerPage.Add('Code d''inscription :', False);
-  ServerPage.Values[0] := 'http://localhost:5080';
+
+  // Pré-remplit depuis une installation précédente, si présente.
+  existing := ExpandConstant('{app}\appsettings.json');
+  srv := ReadJsonStr(existing, 'ServerUrl');
+  if srv = '' then srv := 'http://localhost:5080';
+  ServerPage.Values[0] := srv;
+  ServerPage.Values[1] := ReadJsonStr(existing, 'EnrollmentCode');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   cfg: string;
 begin
-  // On n'écrit la config que lors d'une première installation (poste non inscrit).
-  if (CurStep = ssPostInstall) and (not IsEnrolled()) then
+  if CurStep = ssPostInstall then
   begin
     // Écrit un appsettings.json minimal avec les réponses de l'utilisateur.
     cfg :=
