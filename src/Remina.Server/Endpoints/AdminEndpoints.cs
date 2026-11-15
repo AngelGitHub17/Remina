@@ -46,6 +46,35 @@ public static class AdminEndpoints
             });
         });
 
+        // Liste des codes d'inscription (actifs et utilisables en premier).
+        g.MapGet("/enrollment-codes", async (HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            var now = DateTimeOffset.UtcNow;
+            // SQLite ne trie pas les DateTimeOffset : on matérialise puis on trie en mémoire.
+            var all = await db.EnrollmentCodes.ToListAsync();
+            var codes = all.OrderByDescending(c => c.CreatedAt)
+                .Select(c => new
+                {
+                    c.Id, c.Code, c.Label, c.BureauId, c.RemainingUses, c.ExpiresAt, c.IsRevoked,
+                    Usable = c.IsUsable(now),
+                })
+                .ToList();
+            return Results.Ok(codes);
+        });
+
+        // Révoquer un code d'inscription.
+        g.MapPost("/enrollment-codes/{id:guid}/revoke", async (
+            Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            var c = await db.EnrollmentCodes.FindAsync(id);
+            if (c is null) return Results.NotFound();
+            c.IsRevoked = true;
+            await db.SaveChangesAsync();
+            return Results.Ok();
+        });
+
         // --- Bureaux (locaux) ---
 
         g.MapPost("/bureaus", async (
@@ -81,6 +110,18 @@ public static class AdminEndpoints
                 })
                 .ToListAsync();
             return Results.Ok(bureaus);
+        });
+
+        // Supprimer un bureau (ses postes sont détachés, pas supprimés).
+        g.MapDelete("/bureaus/{id:guid}", async (
+            Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            var b = await db.Bureaus.FindAsync(id);
+            if (b is null) return Results.NotFound();
+            db.Bureaus.Remove(b);
+            await db.SaveChangesAsync();
+            return Results.Ok();
         });
 
         g.MapGet("/bureaus/{id:guid}/machines", async (
@@ -193,6 +234,38 @@ public static class AdminEndpoints
             return Results.Ok(new { machine.Id, machine.BureauId });
         });
 
+        // Détail complet d'un poste (inventaire + bureau).
+        g.MapGet("/machines/{id:guid}", async (
+            Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            var now = DateTimeOffset.UtcNow;
+            var m = await db.Machines.Include(x => x.Bureau).FirstOrDefaultAsync(x => x.Id == id);
+            if (m is null) return Results.NotFound();
+            return Results.Ok(new
+            {
+                m.Id, m.Name, m.Hostname, m.Os, m.OsVersion, m.Manufacturer, m.Model,
+                m.CpuName, m.CpuCores, m.TotalRamBytes, m.PrimaryMacAddress, m.HardwareId,
+                m.AgentVersion, m.EnrolledAt, m.LastSeenAt, m.CurrentUser,
+                m.RemoteSessionActive, m.UserIdle, m.BureauId,
+                BureauName = m.Bureau != null ? m.Bureau.Name : null,
+                Online = m.LastSeenAt != null && m.LastSeenAt > now.AddMinutes(-2),
+            });
+        });
+
+        // Renommer un poste.
+        g.MapPatch("/machines/{id:guid}", async (
+            Guid id, RenameDto dto, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            if (string.IsNullOrWhiteSpace(dto.Name)) return Results.BadRequest(new { error = "Nom requis." });
+            var m = await db.Machines.FindAsync(id);
+            if (m is null) return Results.NotFound();
+            m.Name = dto.Name.Trim();
+            await db.SaveChangesAsync();
+            return Results.Ok(new { m.Id, m.Name });
+        });
+
         g.MapGet("/machines", async (HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
             if (!IsAdmin(http, cfg)) return Results.Unauthorized();
@@ -259,4 +332,5 @@ public static class AdminEndpoints
     public record CreateBureauDto(string Name, string? Description, string? Location);
     public record AssignBureauDto(Guid? BureauId);
     public record CreateTimeEntryDto(string Project, DateTimeOffset Start, DateTimeOffset End, string? Note, string? Source);
+    public record RenameDto(string Name);
 }

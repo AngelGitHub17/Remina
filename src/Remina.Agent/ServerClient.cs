@@ -1,7 +1,11 @@
+using System.Net;
 using System.Net.Http.Json;
 using Remina.Shared;
 
 namespace Remina.Agent;
+
+/// <summary>Issue d'un heartbeat : OK, rejeté (poste inconnu/jeton invalide), ou serveur injoignable.</summary>
+public enum HeartbeatResult { Ok, Unauthorized, Unreachable }
 
 /// <summary>Appels HTTP de l'agent vers le serveur Remina.</summary>
 public class ServerClient
@@ -20,7 +24,8 @@ public class ServerClient
         return await resp.Content.ReadFromJsonAsync<EnrollResponse>(ct);
     }
 
-    public async Task<HeartbeatResponse?> HeartbeatAsync(string token, HeartbeatRequest req, CancellationToken ct)
+    public async Task<(HeartbeatResult Result, HeartbeatResponse? Response)> HeartbeatAsync(
+        string token, HeartbeatRequest req, CancellationToken ct)
     {
         using var msg = new HttpRequestMessage(HttpMethod.Post, "/api/agent/heartbeat")
         {
@@ -28,8 +33,11 @@ public class ServerClient
         };
         msg.Headers.Add("X-Agent-Token", token);
         var resp = await _http.SendAsync(msg, ct);
-        if (!resp.IsSuccessStatusCode) return null;
-        return await resp.Content.ReadFromJsonAsync<HeartbeatResponse>(ct);
+        if (resp.StatusCode == HttpStatusCode.Unauthorized)
+            return (HeartbeatResult.Unauthorized, null);
+        if (!resp.IsSuccessStatusCode)
+            return (HeartbeatResult.Unreachable, null);
+        return (HeartbeatResult.Ok, await resp.Content.ReadFromJsonAsync<HeartbeatResponse>(ct));
     }
 
     /// <summary>Demande au serveur si une version d'agent plus récente est disponible.</summary>

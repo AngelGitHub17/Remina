@@ -87,8 +87,8 @@ public class AgentWorker : BackgroundService
                     AgentVersion = ReminaVersion.Semver,
                 };
 
-                var resp = await _client.HeartbeatAsync(_state.AgentToken, hb, ct);
-                if (resp is not null)
+                var (result, resp) = await _client.HeartbeatAsync(_state.AgentToken, hb, ct);
+                if (result == HeartbeatResult.Ok && resp is not null)
                 {
                     nextDelay = resp.NextHeartbeatSeconds;
                     _status.LastHeartbeatOk = DateTimeOffset.UtcNow;
@@ -98,10 +98,20 @@ public class AgentWorker : BackgroundService
                     foreach (var cmd in resp.Commands)
                         Dispatch(cmd);
                 }
+                else if (result == HeartbeatResult.Unauthorized)
+                {
+                    // Le serveur ne reconnaît plus ce poste (supprimé, base réinitialisée) :
+                    // on efface l'identité locale et on se réinscrit.
+                    _log.LogWarning("Poste non reconnu par le serveur — réinscription.");
+                    _status.LastError = "Réinscription en cours";
+                    _status.Enrolled = false;
+                    _status.NotifyChanged();
+                    await ReEnrollAsync(ct);
+                }
                 else
                 {
-                    _log.LogWarning("Heartbeat refusé par le serveur (jeton invalide ?).");
-                    _status.LastError = "Heartbeat refusé";
+                    _log.LogWarning("Serveur injoignable au heartbeat.");
+                    _status.LastError = "Serveur injoignable";
                     _status.NotifyChanged();
                 }
             }
@@ -216,6 +226,24 @@ public class AgentWorker : BackgroundService
             }
 
             await Task.Delay(TimeSpan.FromSeconds(sampleSeconds), ct);
+        }
+    }
+
+    /// <summary>Efface l'identité et réessaie l'inscription (après un refus serveur).</summary>
+    private async Task ReEnrollAsync(CancellationToken ct)
+    {
+        _state = new AgentState();
+        if (_hub is not null) { try { await _hub.DisposeAsync(); } catch { } _hub = null; }
+
+        while (!_state.IsEnrolled && !ct.IsCancellationRequested)
+        {
+            if (await TryEnrollAsync(ct))
+            {
+                await ConnectHubAsync(ct);
+                return;
+            }
+            _log.LogWarning("Réinscription impossible (code épuisé ou serveur injoignable). Nouvel essai dans 30 s.");
+            await Task.Delay(TimeSpan.FromSeconds(30), ct);
         }
     }
 

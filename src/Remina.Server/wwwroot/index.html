@@ -42,6 +42,10 @@
   .toast.err { border-left-color:var(--danger); }
   code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
   .gate { max-width:420px; margin:12vh auto; }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; z-index:50; }
+  .modal .box { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; max-width:560px; width:100%; }
+  .modal .box h1 { font-size:16px; margin:0 0 14px; display:flex; justify-content:space-between; }
+  .modal .box h1 button { background:var(--panel2); border:1px solid var(--line); color:var(--muted); padding:4px 10px; }
 </style>
 </head>
 <body>
@@ -96,8 +100,8 @@
       <div class="card">
         <h2>Bureaux</h2>
         <table>
-          <thead><tr><th>Nom</th><th>Emplacement</th><th>Description</th><th>Postes</th></tr></thead>
-          <tbody id="bureausBody"><tr><td colspan="4" class="muted">Chargement…</td></tr></tbody>
+          <thead><tr><th>Nom</th><th>Emplacement</th><th>Description</th><th>Postes</th><th></th></tr></thead>
+          <tbody id="bureausBody"><tr><td colspan="5" class="muted">Chargement…</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -158,9 +162,23 @@
         </div>
         <div id="codeOut" class="hide" style="margin-top:12px"></div>
       </div>
+      <div class="card">
+        <h2>Codes existants</h2>
+        <table>
+          <thead><tr><th>Code</th><th>Libellé</th><th>Bureau</th><th>Utilisations</th><th>Expiration</th><th>État</th><th></th></tr></thead>
+          <tbody id="codesBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
+        </table>
+      </div>
     </section>
 
   </main>
+
+  <div id="modal" class="modal hide" onclick="if(event.target===this)closeModal()">
+    <div class="box">
+      <h1>Détail du poste <button onclick="closeModal()">Fermer</button></h1>
+      <div id="modalBody"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -203,6 +221,72 @@ function tab(name){
   ["machines","bureaus","activity","recap","codes"].forEach(n=>document.getElementById("tab-"+n).classList.toggle("hide", n!==name));
   if(name==="activity") fillActivityMachines();
   if(name==="recap") initRecap();
+  if(name==="codes") loadCodes();
+}
+
+async function delBureau(id, name){
+  if(!confirm(`Supprimer le bureau « ${name} » ? Les postes seront détachés.`)) return;
+  try { await api("/api/admin/bureaus/"+id,{method:"DELETE"}); toast("Bureau supprimé."); refresh(); }
+  catch(e){ toast(e.message, true); }
+}
+
+async function loadCodes(){
+  const body=document.getElementById("codesBody");
+  try {
+    const codes=await api("/api/admin/enrollment-codes");
+    const bn=id=>{ const b=State.bureaus.find(x=>x.id===id); return b?esc(b.name):'—'; };
+    body.innerHTML = codes.length ? codes.map(c=>`
+      <tr>
+        <td><code>${esc(c.code)}</code></td>
+        <td>${esc(c.label||'—')}</td>
+        <td>${bn(c.bureauId)}</td>
+        <td>${c.remainingUses}</td>
+        <td class="muted">${c.expiresAt?new Date(c.expiresAt).toLocaleString('fr-FR'):'jamais'}</td>
+        <td>${c.usable?'<span class="dot on"></span>actif':(c.isRevoked?'révoqué':'épuisé/expiré')}</td>
+        <td>${c.usable?`<button class="sec" onclick="revokeCode('${c.id}')">Révoquer</button>`:''}</td>
+      </tr>`).join("") : '<tr><td colspan="7" class="muted">Aucun code.</td></tr>';
+  } catch(e){ toast(e.message, true); }
+}
+async function revokeCode(id){
+  try { await api("/api/admin/enrollment-codes/"+id+"/revoke",{method:"POST"}); toast("Code révoqué."); loadCodes(); }
+  catch(e){ toast(e.message, true); }
+}
+
+async function openMachine(id){
+  try {
+    const m=await api("/api/admin/machines/"+id);
+    const today=new Date().toLocaleDateString('en-CA');
+    let act={apps:[]};
+    try { act=await api(`/api/admin/machines/${id}/activity?day=${today}`); } catch(_){}
+    const gb=b=>b?(b/1073741824).toFixed(1)+" Go":"—";
+    const line=(k,v)=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><span class="muted">${k}</span><span>${v}</span></div>`;
+    const actRows = act.apps.length ? act.apps.slice(0,8).map(a=>`<tr><td>${esc(a.app)}</td><td>${fmtDur(a.seconds)}</td></tr>`).join("") : '<tr><td colspan="2" class="muted">Aucune activité aujourd\'hui.</td></tr>';
+    document.getElementById("modalBody").innerHTML=`
+      <div class="row" style="margin-bottom:12px">
+        <input id="mName" value="${esc(m.name)}" style="flex:1">
+        <button onclick="renameMachine('${m.id}')">Renommer</button>
+      </div>
+      ${line('Hôte', esc(m.hostname||'—'))}
+      ${line('OS', (OS[m.os]||'?')+' '+esc(m.osVersion||''))}
+      ${line('Processeur', esc(m.cpuName||'—')+(m.cpuCores?` (${m.cpuCores} cœurs)`:''))}
+      ${line('Mémoire', gb(m.totalRamBytes))}
+      ${line('Adresse MAC', esc(m.primaryMacAddress||'—'))}
+      ${line('Bureau', esc(m.bureauName||'—'))}
+      ${line('Utilisateur', esc(m.currentUser||'—'))}
+      ${line('Version agent', esc(m.agentVersion||'—'))}
+      ${line('Inscrit le', new Date(m.enrolledAt).toLocaleString('fr-FR'))}
+      ${line('ID matériel', '<small class="muted">'+esc(m.hardwareId||'—')+'</small>')}
+      <h2 style="margin-top:16px">Activité du jour</h2>
+      <table><thead><tr><th>Application</th><th>Temps</th></tr></thead><tbody>${actRows}</tbody></table>`;
+    document.getElementById("modal").classList.remove("hide");
+  } catch(e){ toast(e.message, true); }
+}
+function closeModal(){ document.getElementById("modal").classList.add("hide"); }
+async function renameMachine(id){
+  const name=document.getElementById("mName").value.trim();
+  if(!name) return toast("Nom requis.", true);
+  try { await api("/api/admin/machines/"+id,{method:"PATCH",body:JSON.stringify({name})});
+    toast("Poste renommé."); closeModal(); refresh(); } catch(e){ toast(e.message, true); }
 }
 
 function dur(min){ const h=Math.floor(min/60), m=min%60; return (h>0?h+" h ":"")+(m<10&&h>0?"0":"")+m+" min"; }
@@ -297,7 +381,7 @@ function renderMachines(){
     <tr>
       <td><span class="dot ${m.online?'on':'off'}"></span>${m.online?'en ligne':'hors ligne'}
           ${m.remoteSessionActive?'<span class="tag rdp">RDP</span>':''}</td>
-      <td>${esc(m.name)}</td>
+      <td><a href="#" onclick="openMachine('${m.id}');return false" style="color:var(--accent);text-decoration:none">${esc(m.name)}</a></td>
       <td>${OS[m.os]||'?'}</td>
       <td>${esc(m.currentUser||'—')}</td>
       <td><select onchange="assignBureau('${m.id}', this.value)">${opts.replace('value="'+(m.bureauId||'')+'"','value="'+(m.bureauId||'')+'" selected')}</select></td>
@@ -315,7 +399,8 @@ function renderBureaus(){
   const body=document.getElementById("bureausBody");
   if(!State.bureaus.length){ body.innerHTML='<tr><td colspan="4" class="muted">Aucun bureau.</td></tr>'; return; }
   body.innerHTML = State.bureaus.map(b=>`
-    <tr><td>${esc(b.name)}</td><td>${esc(b.location||'—')}</td><td class="muted">${esc(b.description||'')}</td><td>${b.machineCount}</td></tr>`).join("");
+    <tr><td>${esc(b.name)}</td><td>${esc(b.location||'—')}</td><td class="muted">${esc(b.description||'')}</td><td>${b.machineCount}</td>
+    <td><button class="sec" onclick="delBureau('${b.id}','${esc(b.name)}')">✕</button></td></tr>`).join("");
 }
 function fillBureauSelect(){
   document.getElementById("cdBureau").innerHTML =
