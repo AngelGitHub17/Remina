@@ -148,6 +148,10 @@ Produits par le workflow CI (artefacts, et Release sur tag) :
 - **Windows** : `Remina-Server-Setup.exe` / `Remina-Agent-Setup.exe` (Inno Setup). Ils
   demandent l'URL du serveur / la clé admin, écrivent la config et enregistrent un
   **service Windows**.
+- **Windows (interface)** : `Remina-Agent-GUI-Setup.exe` — l'agent avec icône dans la
+  barre des tâches et fenêtre d'état. Il tourne **dans la session** de l'utilisateur
+  (démarrage automatique à l'ouverture de session), donc verrouillage et messages
+  l'atteignent, au contraire du service (voir ci-dessous).
 - **Linux** : ZIP `*-linux-x64` contenant le binaire, l'unité systemd et `install.sh` :
   `sudo ./install.sh server` ou `sudo ./install.sh agent` (service systemd, config guidée).
 - **macOS** : ZIP `Remina-Agent-osx-*` avec `install.sh` et un LaunchDaemon :

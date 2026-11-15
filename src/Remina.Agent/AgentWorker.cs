@@ -13,21 +13,31 @@ public class AgentWorker : BackgroundService
     private readonly IConfiguration _cfg;
     private readonly IPlatform _platform;
     private readonly ServerClient _client;
+    private readonly AgentStatus _status;
     private AgentState _state;
 
-    public AgentWorker(ILogger<AgentWorker> log, IConfiguration cfg)
+    public AgentWorker(ILogger<AgentWorker> log, IConfiguration cfg, AgentStatus status)
     {
         _log = log;
         _cfg = cfg;
+        _status = status;
         _platform = PlatformFactory.Create();
         var serverUrl = cfg["Remina:ServerUrl"] ?? "http://localhost:5080";
         _client = new ServerClient(serverUrl);
         _state = AgentState.Load() ?? new AgentState();
+        _status.ServerUrl = serverUrl;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         _log.LogInformation("Agent Remina {Version} — OS {Os}", ReminaVersion.Full, _platform.Os);
+
+        if (_state.IsEnrolled)
+        {
+            _status.Enrolled = true;
+            _status.MachineName = _state.MachineName;
+            _status.NotifyChanged();
+        }
 
         // Inscription : on réessaie jusqu'à réussir (serveur momentanément injoignable, etc.).
         while (!_state.IsEnrolled && !ct.IsCancellationRequested)
@@ -69,12 +79,18 @@ public class AgentWorker : BackgroundService
                 if (resp is not null)
                 {
                     nextDelay = resp.NextHeartbeatSeconds;
+                    _status.LastHeartbeatOk = DateTimeOffset.UtcNow;
+                    _status.RemoteSessionActive = remote;
+                    _status.LastError = null;
+                    _status.NotifyChanged();
                     foreach (var cmd in resp.Commands)
                         HandleCommand(cmd, remote);
                 }
                 else
                 {
                     _log.LogWarning("Heartbeat refusé par le serveur (jeton invalide ?).");
+                    _status.LastError = "Heartbeat refusé";
+                    _status.NotifyChanged();
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -123,6 +139,9 @@ public class AgentWorker : BackgroundService
             // La session continue ; au prochain démarrage, le serveur réutilise le poste (même HardwareId).
             _log.LogWarning(ex, "Inscription OK mais impossible d'enregistrer l'état local.");
         }
+        _status.Enrolled = true;
+        _status.MachineName = resp.MachineName;
+        _status.NotifyChanged();
         _log.LogInformation("Poste inscrit : {Name} ({Id})", resp.MachineName, resp.MachineId);
         return true;
     }

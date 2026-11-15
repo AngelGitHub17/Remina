@@ -28,10 +28,15 @@ jobs:
           dotnet publish src/Remina.Server -c Release -r ${{ matrix.rid }}
           --self-contained true -p:PublishSingleFile=true -o out/server
 
-      - name: Publier l'agent
+      - name: Publier l'agent (service)
         run: >
           dotnet publish src/Remina.Agent -c Release -r ${{ matrix.rid }}
           --self-contained true -p:PublishSingleFile=true -o out/agent
+
+      - name: Publier l'agent (interface)
+        run: >
+          dotnet publish src/Remina.Agent.Tray -c Release -r ${{ matrix.rid }}
+          --self-contained true -p:PublishSingleFile=true -o out/tray
 
       - name: Inclure les scripts d'installation
         run: |
@@ -50,6 +55,7 @@ jobs:
           mkdir -p dist
           (cd out/server && zip -rq ../../dist/Remina-Server-${{ matrix.rid }}.zip .)
           (cd out/agent  && zip -rq ../../dist/Remina-Agent-${{ matrix.rid }}.zip .)
+          (cd out/tray   && zip -rq ../../dist/Remina-Agent-GUI-${{ matrix.rid }}.zip .)
 
       - uses: actions/upload-artifact@v4
         with:
@@ -66,11 +72,12 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Publier serveur et agent (win-x64)
+      - name: Publier serveur et agents (win-x64)
         shell: pwsh
         run: |
-          dotnet publish src/Remina.Server -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o out/server
-          dotnet publish src/Remina.Agent  -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o out/agent
+          dotnet publish src/Remina.Server    -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o out/server
+          dotnet publish src/Remina.Agent     -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o out/agent
+          dotnet publish src/Remina.Agent.Tray -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o out/tray
 
       - name: Installer Inno Setup
         shell: pwsh
@@ -81,6 +88,7 @@ jobs:
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" packaging\windows\remina-server.iss
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" packaging\windows\remina-agent.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" packaging\windows\remina-agent-tray.iss
 
       - uses: actions/upload-artifact@v4
         with:

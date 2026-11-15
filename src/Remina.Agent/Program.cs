@@ -12,6 +12,7 @@ var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 builder.Services.AddWindowsService(o => o.ServiceName = "Remina Agent");
 builder.Services.AddSystemd();
 
+builder.Services.AddSingleton<AgentStatus>();
 builder.Services.AddHostedService<AgentWorker>();
 var host = builder.Build();
 host.Run();
