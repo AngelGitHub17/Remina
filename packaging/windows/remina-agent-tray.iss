@@ -54,7 +54,6 @@ begin
 end;
 
 procedure InitializeWizard;
-var existing, srv: string;
 begin
   ServerPage := CreateInputQueryPage(wpSelectDir,
     'Connexion au serveur Remina',
@@ -62,11 +61,20 @@ begin
     'Ces valeurs sont écrites dans la configuration de l''agent.');
   ServerPage.Add('URL du serveur (ex : http://192.168.1.10:5080) :', False);
   ServerPage.Add('Code d''inscription :', False);
-  existing := ExpandConstant('{app}\appsettings.json');
-  srv := ReadJsonStr(existing, 'ServerUrl');
-  if srv = '' then srv := 'http://localhost:5080';
-  ServerPage.Values[0] := srv;
-  ServerPage.Values[1] := ReadJsonStr(existing, 'EnrollmentCode');
+  ServerPage.Values[0] := 'http://localhost:5080';
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+var existing, srv, code: string;
+begin
+  if (ServerPage <> nil) and (CurPageID = ServerPage.ID) then
+  begin
+    existing := ExpandConstant('{app}\appsettings.json');
+    srv := ReadJsonStr(existing, 'ServerUrl');
+    if srv <> '' then ServerPage.Values[0] := srv;
+    code := ReadJsonStr(existing, 'EnrollmentCode');
+    if code <> '' then ServerPage.Values[1] := code;
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
