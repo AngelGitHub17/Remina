@@ -6,7 +6,11 @@
   <Border Padding="18">
     <DockPanel>
       <TextBlock DockPanel.Dock="Top" Text="Imprimer le récapitulatif ?" FontSize="17" FontWeight="Bold" Foreground="#e6e8ee"/>
-      <TextBlock DockPanel.Dock="Top" x:Name="Countdown" Foreground="#f5a623" Margin="0,4,0,10"/>
+      <TextBlock DockPanel.Dock="Top" x:Name="Countdown" Foreground="#f5a623" Margin="0,4,0,8"/>
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
+        <TextBlock Text="Imprimante :" VerticalAlignment="Center" Foreground="#9aa3b2"/>
+        <ComboBox x:Name="PrinterBox" MinWidth="240"/>
+      </StackPanel>
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
         <Button Content="Annuler" Click="OnCancel"/>
         <Button Content="Imprimer" Click="OnPrint" Background="#5b8cff" Foreground="#fff"/>

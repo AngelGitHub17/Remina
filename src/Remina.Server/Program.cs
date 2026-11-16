@@ -30,6 +30,8 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ReminaDbContext>();
     db.Database.EnsureCreated();
+    // Ajoute les tables/colonnes manquantes sur une base créée par une version antérieure.
+    Remina.Server.Data.SchemaGuard.Ensure(db);
 }
 
 // Console web d'administration (wwwroot/index.html) servie à la racine.

@@ -15,6 +15,8 @@ public class AgentState
     public string HardwareId { get; set; } = "";
     /// <summary>URL du serveur retenue à l'inscription (survit à une config qui pointe ailleurs).</summary>
     public string ServerUrl { get; set; } = "";
+    /// <summary>Imprimante choisie pour les tickets (mémorisée après le premier choix).</summary>
+    public string PrinterName { get; set; } = "";
 
     private static string StatePath =>
         Path.Combine(ReminaPaths.DataDir, "remina-agent.json");

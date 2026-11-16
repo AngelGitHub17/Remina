@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using Remina.Agent;
 using Remina.Shared;
 
 namespace Remina.Agent.Tray;
@@ -18,11 +20,23 @@ public partial class PrintDialog : Window
 
     public PrintDialog() : this("") { }
 
+    private readonly AgentStatus? _status;
+
     public PrintDialog(string text)
     {
         InitializeComponent();
         _text = text;
         Preview.Text = text;
+
+        _status = Program.AppHost?.Services.GetService<AgentStatus>();
+        if (_status is not null)
+        {
+            foreach (var p in _status.Printers) PrinterBox.Items.Add(p);
+            PrinterBox.SelectedItem = !string.IsNullOrEmpty(_status.PrinterName)
+                ? _status.PrinterName
+                : (_status.Printers.Count > 0 ? _status.Printers[0] : null);
+        }
+
         UpdateCountdown();
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += (_, _) =>
@@ -42,7 +56,13 @@ public partial class PrintDialog : Window
         if (_done) return;
         _done = true;
         _timer.Stop();
-        Printing.Print(_text);
+        var printer = PrinterBox.SelectedItem as string;
+        if (_status is not null && !string.IsNullOrEmpty(printer))
+        {
+            _status.PrinterName = printer;
+            _status.OnPrinterChosen?.Invoke(printer); // mémorise le choix
+        }
+        Printing.Print(_text, printer);
         Close();
     }
 

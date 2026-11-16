@@ -21,6 +21,12 @@ public class AgentStatus
     /// <summary>Mode privé : met en pause le suivi d'activité (basculable depuis l'UI).</summary>
     public bool PrivateMode { get; set; }
 
+    /// <summary>Imprimantes disponibles et imprimante choisie (pour le dialogue d'impression).</summary>
+    public IReadOnlyList<string> Printers { get; set; } = Array.Empty<string>();
+    public string PrinterName { get; set; } = "";
+    /// <summary>Appelé quand l'utilisateur choisit une imprimante, pour mémoriser le choix.</summary>
+    public Action<string>? OnPrinterChosen;
+
     public bool Online =>
         LastHeartbeatOk is not null &&
         DateTimeOffset.UtcNow - LastHeartbeatOk < TimeSpan.FromMinutes(1);

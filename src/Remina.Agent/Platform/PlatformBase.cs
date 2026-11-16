@@ -67,6 +67,26 @@ public abstract class PlatformBase : IPlatform
     // nécessiteront des autorisations/extensions dédiées, ajoutées plus tard.
     public virtual (string App, string? Title)? GetForegroundApp() => null;
 
+    // Imprimantes via CUPS par défaut (Linux/macOS) ; Windows surcharge.
+    public virtual IReadOnlyList<string> GetPrinters()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("lpstat", "-e")
+            { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
+            using var p = Process.Start(psi);
+            if (p is null) return Array.Empty<string>();
+            var o = p.StandardOutput.ReadToEnd();
+            p.WaitForExit(3000);
+            return o.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+        }
+        catch { return Array.Empty<string>(); }
+    }
+
+    // Auto-login : propre à Windows ; ailleurs, se configure via le gestionnaire d'affichage.
+    public virtual bool ConfigureAutoLogin(string user, string password, string? domain) => false;
+
     /// <summary>Lance un processus sans fenêtre, sans attendre, en avalant les erreurs.</summary>
     protected static void Run(string file, params string[] args)
     {

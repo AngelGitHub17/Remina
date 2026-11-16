@@ -46,6 +46,16 @@ public class AgentWorker : BackgroundService
             _status.NotifyChanged();
         }
 
+        // Imprimantes : liste + choix mémorisé, et persistance du choix fait depuis l'UI.
+        _status.Printers = _platform.GetPrinters();
+        _status.PrinterName = !string.IsNullOrWhiteSpace(_state.PrinterName)
+            ? _state.PrinterName : (_cfg["Remina:PrinterName"] ?? "");
+        _status.OnPrinterChosen = p =>
+        {
+            _state.PrinterName = p;
+            try { _state.Save(); } catch { }
+        };
+
         // Inscription : on réessaie jusqu'à réussir (serveur momentanément injoignable, etc.).
         while (!_state.IsEnrolled && !ct.IsCancellationRequested)
         {
@@ -304,14 +314,27 @@ public class AgentWorker : BackgroundService
                 else
                 {
                     _log.LogInformation("Ticket reçu : impression directe (pas d'interface).");
-                    Printing.Print(ticket);
+                    Printing.Print(ticket, _status.PrinterName);
                 }
                 break;
             case AgentCommandType.AutoLogin:
                 if (remoteSessionActive)
+                {
                     _log.LogInformation("Auto-login ignoré : session RDP active.");
-                else
-                    _log.LogInformation("Ordre : connexion automatique (pas encore implémenté).");
+                    break;
+                }
+                var user = _cfg["Remina:AutoLogin:User"];
+                var pass = _cfg["Remina:AutoLogin:Password"];
+                var domain = _cfg["Remina:AutoLogin:Domain"];
+                if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
+                {
+                    _log.LogWarning("Auto-login demandé mais non configuré (Remina:AutoLogin:User/Password).");
+                    break;
+                }
+                var applied = _platform.ConfigureAutoLogin(user, pass, domain);
+                _log.LogInformation(applied
+                    ? "Connexion automatique configurée."
+                    : "Échec de la configuration auto-login (droits administrateur requis ?).");
                 break;
         }
     }

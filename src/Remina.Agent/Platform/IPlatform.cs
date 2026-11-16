@@ -42,4 +42,13 @@ public interface IPlatform
     /// Utilisé par le suivi d'activité.
     /// </summary>
     (string App, string? Title)? GetForegroundApp();
+
+    /// <summary>Liste des imprimantes installées (pour le choix dans l'interface).</summary>
+    IReadOnlyList<string> GetPrinters();
+
+    /// <summary>
+    /// Configure la connexion de session automatique (Windows). Retourne vrai si appliqué.
+    /// Nécessite des droits administrateur (service/LocalSystem).
+    /// </summary>
+    bool ConfigureAutoLogin(string user, string password, string? domain);
 }

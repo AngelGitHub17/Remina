@@ -86,6 +86,58 @@ public sealed class WindowsPlatform : PlatformBase
         catch { return null; }
     }
 
+    public override IReadOnlyList<string> GetPrinters()
+    {
+        if (!OperatingSystem.IsWindows()) return base.GetPrinters();
+        try
+        {
+            var psi = new ProcessStartInfo("powershell")
+            { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
+            psi.ArgumentList.Add("-NoProfile");
+            psi.ArgumentList.Add("-Command");
+            psi.ArgumentList.Add("Get-Printer | Select-Object -ExpandProperty Name");
+            using var p = Process.Start(psi);
+            if (p is null) return Array.Empty<string>();
+            var o = p.StandardOutput.ReadToEnd();
+            p.WaitForExit(5000);
+            return o.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+        }
+        catch { return Array.Empty<string>(); }
+    }
+
+    /// <summary>
+    /// Active la connexion automatique Windows via les clés Winlogon (HKLM).
+    /// Requiert des droits administrateur. Note : DefaultPassword est stocké en clair dans
+    /// le registre — l'outil Sysinternals Autologon (secret LSA) est plus sûr.
+    /// </summary>
+    public override bool ConfigureAutoLogin(string user, string password, string? domain)
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        const string key = @"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon";
+        var ok = RegAdd(key, "AutoAdminLogon", "1")
+              && RegAdd(key, "DefaultUserName", user)
+              && RegAdd(key, "DefaultPassword", password);
+        if (!string.IsNullOrEmpty(domain)) RegAdd(key, "DefaultDomainName", domain!);
+        return ok;
+    }
+
+    private static bool RegAdd(string key, string name, string data)
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        try
+        {
+            var psi = new ProcessStartInfo("reg") { UseShellExecute = false, CreateNoWindow = true };
+            foreach (var a in new[] { "add", key, "/v", name, "/t", "REG_SZ", "/d", data, "/f" })
+                psi.ArgumentList.Add(a);
+            using var p = Process.Start(psi);
+            if (p is null) return false;
+            p.WaitForExit(4000);
+            return p.ExitCode == 0;
+        }
+        catch { return false; }
+    }
+
     private const int SM_REMOTESESSION = 0x1000;
 
     [SupportedOSPlatform("windows")]

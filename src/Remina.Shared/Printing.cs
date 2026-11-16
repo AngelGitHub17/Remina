@@ -8,16 +8,22 @@ namespace Remina.Shared;
 /// </summary>
 public static class Printing
 {
-    public static bool Print(string text)
+    public static bool Print(string text, string? printer = null)
     {
         var tmp = Path.Combine(Path.GetTempPath(), $"remina-ticket-{Guid.NewGuid():N}.txt");
         try
         {
             File.WriteAllText(tmp, text);
             if (OperatingSystem.IsWindows())
+            {
+                var outp = string.IsNullOrWhiteSpace(printer)
+                    ? "Out-Printer"
+                    : $"Out-Printer -Name '{printer.Replace("'", "''")}'";
                 return Run("powershell", "-NoProfile", "-Command",
-                    $"Get-Content -LiteralPath '{tmp}' -Raw | Out-Printer");
-            return Run("lp", tmp); // CUPS (Linux/macOS)
+                    $"Get-Content -LiteralPath '{tmp}' -Raw | {outp}");
+            }
+            // CUPS (Linux/macOS)
+            return string.IsNullOrWhiteSpace(printer) ? Run("lp", tmp) : Run("lp", "-d", printer, tmp);
         }
         catch { return false; }
         finally
