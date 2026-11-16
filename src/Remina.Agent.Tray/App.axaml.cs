@@ -24,6 +24,8 @@ public partial class App : Application
             // Icône de la barre des tâches (zone de notification) + menu.
             var open = new NativeMenuItem("Ouvrir");
             open.Click += (_, _) => ShowWindow();
+            var autoLogin = new NativeMenuItem("Connexion automatique…");
+            autoLogin.Click += (_, _) => new AutoLoginDialog().Show();
             var quit = new NativeMenuItem("Quitter");
             quit.Click += (_, _) => desktop.Shutdown();
 
@@ -31,7 +33,7 @@ public partial class App : Application
             {
                 Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://Remina.Agent.Tray/Assets/remina.png"))),
                 ToolTipText = "Remina Agent",
-                Menu = new NativeMenu { open, quit },
+                Menu = new NativeMenu { open, autoLogin, quit },
             };
             tray.Clicked += (_, _) => ShowWindow();
             TrayIcon.SetIcons(this, new TrayIcons { tray });

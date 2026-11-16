@@ -51,4 +51,7 @@ public interface IPlatform
     /// Nécessite des droits administrateur (service/LocalSystem).
     /// </summary>
     bool ConfigureAutoLogin(string user, string password, string? domain);
+
+    /// <summary>Désactive la connexion de session automatique.</summary>
+    bool DisableAutoLogin();
 }

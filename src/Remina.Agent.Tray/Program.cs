@@ -13,6 +13,9 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Instance élevée (UAC) : applique la connexion automatique puis quitte, sans UI.
+        if (AutoLoginSetup.HandleElevatedArgs(args)) return;
+
         AppHost = BuildHost(args);
         AppHost.Start();
 

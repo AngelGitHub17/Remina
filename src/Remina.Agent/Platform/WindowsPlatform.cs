@@ -106,37 +106,12 @@ public sealed class WindowsPlatform : PlatformBase
         catch { return Array.Empty<string>(); }
     }
 
-    /// <summary>
-    /// Active la connexion automatique Windows via les clés Winlogon (HKLM).
-    /// Requiert des droits administrateur. Note : DefaultPassword est stocké en clair dans
-    /// le registre — l'outil Sysinternals Autologon (secret LSA) est plus sûr.
-    /// </summary>
+    // Connexion automatique sécurisée (secret LSA). Requiert des droits administrateur.
     public override bool ConfigureAutoLogin(string user, string password, string? domain)
-    {
-        if (!OperatingSystem.IsWindows()) return false;
-        const string key = @"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon";
-        var ok = RegAdd(key, "AutoAdminLogon", "1")
-              && RegAdd(key, "DefaultUserName", user)
-              && RegAdd(key, "DefaultPassword", password);
-        if (!string.IsNullOrEmpty(domain)) RegAdd(key, "DefaultDomainName", domain!);
-        return ok;
-    }
+        => OperatingSystem.IsWindows() && WindowsAutoLogin.Apply(user, password, domain);
 
-    private static bool RegAdd(string key, string name, string data)
-    {
-        if (!OperatingSystem.IsWindows()) return false;
-        try
-        {
-            var psi = new ProcessStartInfo("reg") { UseShellExecute = false, CreateNoWindow = true };
-            foreach (var a in new[] { "add", key, "/v", name, "/t", "REG_SZ", "/d", data, "/f" })
-                psi.ArgumentList.Add(a);
-            using var p = Process.Start(psi);
-            if (p is null) return false;
-            p.WaitForExit(4000);
-            return p.ExitCode == 0;
-        }
-        catch { return false; }
-    }
+    public override bool DisableAutoLogin()
+        => OperatingSystem.IsWindows() && WindowsAutoLogin.Disable();
 
     private const int SM_REMOTESESSION = 0x1000;
 

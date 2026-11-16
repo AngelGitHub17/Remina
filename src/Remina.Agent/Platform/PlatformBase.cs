@@ -86,6 +86,7 @@ public abstract class PlatformBase : IPlatform
 
     // Auto-login : propre à Windows ; ailleurs, se configure via le gestionnaire d'affichage.
     public virtual bool ConfigureAutoLogin(string user, string password, string? domain) => false;
+    public virtual bool DisableAutoLogin() => false;
 
     /// <summary>Lance un processus sans fenêtre, sans attendre, en avalant les erreurs.</summary>
     protected static void Run(string file, params string[] args)

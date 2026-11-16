@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Remina.Agent.Tray.AutoLoginDialog"
+        Title="Connexion automatique" Width="420" Height="340"
+        CanResize="False" WindowStartupLocation="CenterScreen" Background="#0f1115">
+  <Border Padding="20">
+    <StackPanel Spacing="10">
+      <TextBlock Text="Connexion automatique de session" FontSize="16" FontWeight="Bold" Foreground="#e6e8ee"/>
+      <TextBlock TextWrapping="Wrap" Foreground="#9aa3b2" FontSize="12"
+                 Text="Les identifiants restent sur ce poste : le mot de passe est enregistré dans un secret chiffré de Windows (LSA). Une confirmation administrateur (UAC) sera demandée."/>
+      <TextBlock Text="Utilisateur" Foreground="#9aa3b2" FontSize="12"/>
+      <TextBox x:Name="UserBox" Watermark="nom d'utilisateur Windows"/>
+      <TextBlock Text="Mot de passe" Foreground="#9aa3b2" FontSize="12"/>
+      <TextBox x:Name="PassBox" PasswordChar="●"/>
+      <TextBlock Text="Domaine (optionnel)" Foreground="#9aa3b2" FontSize="12"/>
+      <TextBox x:Name="DomainBox" Watermark="laisser vide pour ce poste"/>
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,8,0,0">
+        <Button Content="Désactiver" Click="OnDisable"/>
+        <Button Content="Activer" Click="OnEnable" Background="#5b8cff" Foreground="#fff"/>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</Window>
