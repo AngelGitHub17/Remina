@@ -138,6 +138,57 @@ public static class AdminEndpoints
             return Results.Ok(machines);
         });
 
+        // Tableau de bord : indicateurs + top applis du jour.
+        g.MapGet("/stats", async (HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            var now = DateTimeOffset.UtcNow;
+            var today = DateOnly.FromDateTime(DateTime.Now);
+
+            // Matérialisé en mémoire : SQLite ne traduit ni GroupBy(enum) ni comparaison DateTimeOffset.
+            var machines = await db.Machines.ToListAsync();
+            var total = machines.Count;
+            var online = machines.Count(m => m.LastSeenAt != null && m.LastSeenAt > now.AddMinutes(-2));
+            var bureaus = await db.Bureaus.CountAsync();
+            var codes = await db.EnrollmentCodes.ToListAsync();
+            var codesActive = codes.Count(c => c.IsUsable(now));
+
+            var acts = await db.Activity.Where(a => a.Day == today).ToListAsync();
+            var topApps = acts.GroupBy(a => a.App)
+                .Select(gr => new { app = gr.Key, seconds = gr.Sum(x => x.Seconds) })
+                .OrderByDescending(x => x.seconds).Take(6).ToList();
+
+            var manualToday = (await db.TimeEntries.ToListAsync())
+                .Where(e => DateOnly.FromDateTime(e.Start.LocalDateTime) == today)
+                .Sum(e => e.Minutes);
+
+            var byOs = machines.GroupBy(m => m.Os)
+                .Select(gr => new { os = (int)gr.Key, count = gr.Count() }).ToList();
+
+            return Results.Ok(new
+            {
+                totalMachines = total, onlineMachines = online, bureaus, codesActive,
+                todayActivitySeconds = acts.Sum(a => a.Seconds), todayManualMinutes = manualToday,
+                topApps, byOs,
+            });
+        });
+
+        // Historique des commandes d'un poste.
+        g.MapGet("/machines/{id:guid}/commands", async (
+            Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            var cmds = (await db.AgentCommands.Where(c => c.MachineId == id).ToListAsync())
+                .OrderByDescending(c => c.CreatedAt).Take(25)
+                .Select(c => new
+                {
+                    c.Id, c.Type, c.CreatedAt, c.DeliveredAt,
+                    Preview = c.Type == AgentCommandType.ShowMessage
+                        ? (c.Payload ?? "") : (c.Payload != null ? "(contenu)" : null),
+                }).ToList();
+            return Results.Ok(cmds);
+        });
+
         // --- Suppression d'un poste (cascade : activité et commandes) ---
         g.MapDelete("/machines/{id:guid}", async (
             Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>

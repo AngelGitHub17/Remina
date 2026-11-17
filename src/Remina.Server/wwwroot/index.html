@@ -5,82 +5,119 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Remina — Console</title>
 <style>
-  :root {
-    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
-    --txt:#e6e8ee; --muted:#9aa3b2; --accent:#5b8cff; --ok:#3ecf8e; --off:#6b7280;
-    --warn:#f5a623; --danger:#ef4444;
-  }
-  * { box-sizing:border-box; }
-  body { margin:0; font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); }
-  header { display:flex; align-items:center; gap:12px; padding:12px 18px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
-  header h1 { font-size:16px; margin:0; letter-spacing:.3px; }
-  header .ver { color:var(--muted); font-size:12px; }
-  header .spacer { flex:1; }
-  input, select, button { font:inherit; color:var(--txt); background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:7px 10px; }
-  input::placeholder { color:var(--muted); }
-  button { cursor:pointer; background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
-  button.sec { background:var(--panel2); color:var(--txt); border-color:var(--line); font-weight:500; }
-  button:disabled { opacity:.5; cursor:not-allowed; }
-  nav { display:flex; gap:4px; padding:10px 18px 0; }
-  nav button { background:transparent; border:none; color:var(--muted); border-bottom:2px solid transparent; border-radius:0; padding:8px 12px; font-weight:600; }
-  nav button.active { color:var(--txt); border-bottom-color:var(--accent); }
-  main { padding:18px; max-width:1100px; margin:0 auto; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
-  .card h2 { margin:0 0 12px; font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
-  table { width:100%; border-collapse:collapse; }
-  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
-  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; }
-  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .row > * { flex:0 0 auto; }
-  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; }
-  .dot.on { background:var(--ok); } .dot.off { background:var(--off); }
-  .tag { font-size:11px; padding:2px 8px; border-radius:20px; background:var(--panel2); border:1px solid var(--line); color:var(--muted); }
-  .tag.rdp { color:var(--warn); border-color:var(--warn); }
-  .muted { color:var(--muted); }
-  .hide { display:none; }
-  .toast { position:fixed; bottom:18px; right:18px; background:var(--panel2); border:1px solid var(--line); border-left:3px solid var(--accent); padding:10px 14px; border-radius:8px; max-width:360px; box-shadow:0 8px 30px rgba(0,0,0,.4); }
-  .toast.err { border-left-color:var(--danger); }
-  code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
-  .gate { max-width:420px; margin:12vh auto; }
-  .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; z-index:50; }
-  .modal.hide { display:none; }
-  .modal .box { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; max-width:560px; width:100%; }
-  .modal .box h1 { font-size:16px; margin:0 0 14px; display:flex; justify-content:space-between; }
-  .modal .box h1 button { background:var(--panel2); border:1px solid var(--line); color:var(--muted); padding:4px 10px; }
+  :root{--bg:#0e1014;--side:#14171e;--panel:#171a21;--panel2:#1e222b;--line:#262b36;
+    --txt:#e6e8ee;--muted:#9aa3b2;--accent:#5b8cff;--ok:#3ecf8e;--off:#5b6472;--warn:#f5a623;--danger:#ef4444;}
+  *{box-sizing:border-box;}
+  body{margin:0;font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);}
+  a{color:var(--accent);text-decoration:none;}
+  input,select,button,textarea{font:inherit;color:var(--txt);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 11px;}
+  input::placeholder{color:var(--muted);}
+  button{cursor:pointer;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+  button.sec{background:var(--panel2);color:var(--txt);border-color:var(--line);font-weight:500;}
+  button.sec:hover{border-color:var(--accent);}
+  button.danger{background:transparent;border-color:var(--line);color:var(--danger);}
+  .hide{display:none!important;}
+  /* layout */
+  #shell{display:flex;min-height:100vh;}
+  #side{width:216px;background:var(--side);border-right:1px solid var(--line);flex:0 0 216px;padding:16px 10px;position:sticky;top:0;height:100vh;}
+  #side .brand{font-size:18px;font-weight:800;letter-spacing:.5px;padding:6px 10px 2px;}
+  #side .ver{color:var(--muted);font-size:11px;padding:0 10px 16px;}
+  #side nav{display:flex;flex-direction:column;gap:2px;}
+  #side nav a{display:flex;align-items:center;gap:10px;color:var(--muted);padding:9px 12px;border-radius:8px;font-weight:600;cursor:pointer;}
+  #side nav a.active,#side nav a:hover{background:var(--panel2);color:var(--txt);}
+  #side nav a .i{width:16px;text-align:center;opacity:.9;}
+  #side .foot{position:absolute;bottom:14px;left:10px;right:10px;}
+  #main{flex:1;min-width:0;padding:22px 26px;}
+  .top{display:flex;align-items:center;margin-bottom:18px;gap:12px;}
+  .top h1{font-size:19px;margin:0;}
+  .top .spacer{flex:1;}
+  /* cards */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
+  .card h2{margin:0 0 12px;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:16px;}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;}
+  .kpi .v{font-size:26px;font-weight:800;}
+  .kpi .l{color:var(--muted);font-size:12px;margin-top:2px;}
+  .kpi .s{color:var(--ok);font-size:12px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:820px){.grid2{grid-template-columns:1fr;}#side{display:none;}}
+  /* bars */
+  .bars{display:flex;flex-direction:column;gap:9px;}
+  .bar{display:grid;grid-template-columns:120px 1fr auto;gap:10px;align-items:center;font-size:13px;}
+  .bar .track{background:var(--panel2);border-radius:6px;height:10px;overflow:hidden;}
+  .bar .fill{height:100%;background:linear-gradient(90deg,#5b8cff,#8f6bff);border-radius:6px;}
+  .bar .val{color:var(--muted);font-size:12px;min-width:56px;text-align:right;}
+  /* tables */
+  table{width:100%;border-collapse:collapse;}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;}
+  tr:hover td{background:rgba(255,255,255,.015);}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;}
+  .dot.on{background:var(--ok);}.dot.off{background:var(--off);}
+  .tag{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);}
+  .tag.rdp{color:var(--warn);border-color:var(--warn);}
+  .muted{color:var(--muted);}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  code{background:var(--panel2);padding:2px 6px;border-radius:6px;}
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:36px 16px;overflow:auto;z-index:50;}
+  .modal.hide{display:none!important;}
+  .modal .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:620px;width:100%;}
+  .modal .box h1{font-size:16px;margin:0 0 14px;display:flex;justify-content:space-between;align-items:center;}
+  .modal .box h1 button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:4px 10px;}
+  .kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line);}
+  .toast{position:fixed;bottom:18px;right:18px;background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent);padding:10px 14px;border-radius:8px;max-width:360px;box-shadow:0 8px 30px rgba(0,0,0,.4);z-index:60;}
+  .toast.err{border-left-color:var(--danger);}
+  .gate{max-width:420px;margin:12vh auto;}
 </style>
 </head>
 <body>
 
 <div id="gate" class="gate card">
   <h2>Connexion à la console</h2>
-  <p class="muted">Renseigne la clé d'administration du serveur (en-tête <code>X-Admin-Key</code>).</p>
-  <div class="row">
-    <input id="keyInput" type="password" placeholder="Clé d'administration" style="flex:1">
-    <button onclick="login()">Entrer</button>
-  </div>
-  <p id="gateErr" class="muted" style="color:var(--danger)"></p>
+  <p class="muted">Clé d'administration (<code>X-Admin-Key</code>) :</p>
+  <div class="row"><input id="keyInput" type="password" placeholder="Clé d'administration" style="flex:1"><button onclick="login()">Entrer</button></div>
+  <p id="gateErr" style="color:var(--danger)"></p>
 </div>
 
-<div id="app" class="hide">
-  <header>
-    <h1>Remina</h1>
-    <span class="ver" id="serverVer">—</span>
-    <div class="spacer"></div>
-    <button class="sec" onclick="refresh()">Rafraîchir</button>
-    <button class="sec" onclick="logout()">Quitter</button>
-  </header>
-  <nav>
-    <button data-tab="machines" class="active" onclick="tab('machines')">Postes</button>
-    <button data-tab="bureaus" onclick="tab('bureaus')">Bureaux</button>
-    <button data-tab="activity" onclick="tab('activity')">Activité</button>
-    <button data-tab="recap" onclick="tab('recap')">Récap</button>
-    <button data-tab="codes" onclick="tab('codes')">Codes d'inscription</button>
-  </nav>
-  <main>
+<div id="shell" class="hide">
+  <aside id="side">
+    <div class="brand">Remina</div>
+    <div class="ver" id="ver">—</div>
+    <nav>
+      <a data-v="dash" class="active" onclick="nav('dash')"><span class="i">◧</span> Tableau de bord</a>
+      <a data-v="machines" onclick="nav('machines')"><span class="i">▣</span> Postes</a>
+      <a data-v="bureaus" onclick="nav('bureaus')"><span class="i">◱</span> Bureaux</a>
+      <a data-v="activity" onclick="nav('activity')"><span class="i">◴</span> Activité</a>
+      <a data-v="recap" onclick="nav('recap')"><span class="i">🧾</span> Récap</a>
+      <a data-v="codes" onclick="nav('codes')"><span class="i">⚷</span> Codes</a>
+    </nav>
+    <div class="foot"><button class="sec" style="width:100%" onclick="logout()">Quitter</button></div>
+  </aside>
 
-    <section id="tab-machines">
+  <main id="main">
+    <div class="top"><h1 id="title">Tableau de bord</h1><div class="spacer"></div><button class="sec" onclick="refresh()">Rafraîchir</button></div>
+
+    <!-- DASHBOARD -->
+    <section id="v-dash">
+      <div class="kpis" id="kpis"></div>
+      <div class="grid2">
+        <div class="card"><h2>Top applications — aujourd'hui</h2><div id="topApps" class="bars"><span class="muted">—</span></div></div>
+        <div class="card"><h2>Parc par système</h2><div id="byOs" class="bars"><span class="muted">—</span></div></div>
+      </div>
+      <div class="card"><h2>Postes vus récemment</h2>
+        <table><thead><tr><th>État</th><th>Nom</th><th>OS</th><th>Utilisateur</th><th>Vu</th></tr></thead>
+        <tbody id="recentBody"></tbody></table>
+      </div>
+    </section>
+
+    <!-- MACHINES -->
+    <section id="v-machines" class="hide">
       <div class="card">
-        <h2>Postes</h2>
+        <div class="row" style="margin-bottom:10px">
+          <input id="search" placeholder="Rechercher un poste…" style="flex:1" oninput="renderMachines()">
+          <span class="muted" id="machCount"></span>
+        </div>
         <table>
           <thead><tr><th>État</th><th>Nom</th><th>OS</th><th>Utilisateur</th><th>Bureau</th><th>Vu</th><th>Actions</th></tr></thead>
           <tbody id="machinesBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
@@ -88,381 +125,203 @@
       </div>
     </section>
 
-    <section id="tab-bureaus" class="hide">
-      <div class="card">
-        <h2>Nouveau bureau (local)</h2>
-        <div class="row">
-          <input id="buName" placeholder="Nom (ex : Bureau Salon)">
-          <input id="buLoc" placeholder="Emplacement (optionnel)">
-          <input id="buDesc" placeholder="Description (optionnel)" style="flex:1">
-          <button onclick="createBureau()">Créer</button>
-        </div>
+    <!-- BUREAUS -->
+    <section id="v-bureaus" class="hide">
+      <div class="card"><h2>Nouveau bureau</h2>
+        <div class="row"><input id="buName" placeholder="Nom (ex : Bureau Salon)"><input id="buLoc" placeholder="Emplacement"><input id="buDesc" placeholder="Description" style="flex:1"><button onclick="createBureau()">Créer</button></div>
       </div>
-      <div class="card">
-        <h2>Bureaux</h2>
-        <table>
-          <thead><tr><th>Nom</th><th>Emplacement</th><th>Description</th><th>Postes</th><th></th></tr></thead>
-          <tbody id="bureausBody"><tr><td colspan="5" class="muted">Chargement…</td></tr></tbody>
-        </table>
+      <div class="card"><h2>Bureaux</h2>
+        <table><thead><tr><th>Nom</th><th>Emplacement</th><th>Description</th><th>Postes</th><th></th></tr></thead>
+        <tbody id="bureausBody"><tr><td colspan="5" class="muted">Chargement…</td></tr></tbody></table>
       </div>
     </section>
 
-    <section id="tab-activity" class="hide">
-      <div class="card">
-        <h2>Activité d'un poste</h2>
-        <div class="row">
-          <select id="actMachine" onchange="loadActivity()"></select>
-          <input id="actDay" type="date" onchange="loadActivity()">
-          <button class="sec" onclick="loadActivity()">Afficher</button>
-        </div>
-        <table style="margin-top:12px">
-          <thead><tr><th>Application</th><th>Temps</th><th>Part</th></tr></thead>
-          <tbody id="activityBody"><tr><td colspan="3" class="muted">Choisis un poste.</td></tr></tbody>
-        </table>
+    <!-- ACTIVITY -->
+    <section id="v-activity" class="hide">
+      <div class="card"><h2>Activité d'un poste</h2>
+        <div class="row"><select id="actMachine" onchange="loadActivity()"></select><input id="actDay" type="date" onchange="loadActivity()"></div>
+        <div id="actBars" class="bars" style="margin-top:14px"><span class="muted">Choisis un poste.</span></div>
       </div>
     </section>
 
-    <section id="tab-recap" class="hide">
-      <div class="card">
-        <h2>Ajouter du temps</h2>
-        <div class="row">
-          <input id="teProject" placeholder="Projet (ex : Rémina)">
-          <input id="teDate" type="date">
-          <input id="teStart" type="time" title="Début">
-          <input id="teEnd" type="time" title="Fin">
-          <input id="teNote" placeholder="Note (optionnel)" style="flex:1">
-          <button onclick="addEntry()">Ajouter</button>
-        </div>
+    <!-- RECAP -->
+    <section id="v-recap" class="hide">
+      <div class="card"><h2>Ajouter du temps</h2>
+        <div class="row"><input id="teProject" placeholder="Projet"><input id="teDate" type="date"><input id="teStart" type="time"><input id="teEnd" type="time"><input id="teNote" placeholder="Note" style="flex:1"><button onclick="addEntry()">Ajouter</button></div>
       </div>
-      <div class="card">
-        <h2>Entrées de temps</h2>
-        <div class="row" style="margin-bottom:10px">
-          <label class="muted" style="align-self:center">Du</label>
-          <input id="teFrom" type="date">
-          <label class="muted" style="align-self:center">au</label>
-          <input id="teTo" type="date">
-          <button class="sec" onclick="loadRecap()">Filtrer</button>
-          <button class="sec" onclick="openTicket()">🧾 Ticket imprimable</button>
-          <span id="teTotal" class="tag" style="align-self:center"></span>
-        </div>
-        <table>
-          <thead><tr><th>Projet</th><th>Début</th><th>Fin</th><th>Durée</th><th>Source</th><th>Note</th><th></th></tr></thead>
-          <tbody id="recapBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
-        </table>
+      <div class="card"><h2>Entrées de temps</h2>
+        <div class="row" style="margin-bottom:10px"><span class="muted">Du</span><input id="teFrom" type="date"><span class="muted">au</span><input id="teTo" type="date"><button class="sec" onclick="loadRecap()">Filtrer</button><button class="sec" onclick="openTicket()">🧾 Ticket imprimable</button><span id="teTotal" class="tag"></span></div>
+        <table><thead><tr><th>Projet</th><th>Début</th><th>Fin</th><th>Durée</th><th>Source</th><th>Note</th><th></th></tr></thead>
+        <tbody id="recapBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody></table>
       </div>
     </section>
 
-    <section id="tab-codes" class="hide">
-      <div class="card">
-        <h2>Générer un code d'inscription</h2>
-        <div class="row">
-          <input id="cdLabel" placeholder="Libellé (ex : Salon)">
-          <input id="cdUses" type="number" value="1" min="1" style="width:90px" title="Nombre d'utilisations">
-          <input id="cdHours" type="number" value="24" min="0" style="width:110px" title="Expiration (heures, 0 = jamais)">
-          <select id="cdBureau"><option value="">— Sans bureau —</option></select>
-          <button onclick="createCode()">Générer</button>
-        </div>
+    <!-- CODES -->
+    <section id="v-codes" class="hide">
+      <div class="card"><h2>Générer un code</h2>
+        <div class="row"><input id="cdLabel" placeholder="Libellé"><input id="cdUses" type="number" value="1" min="1" style="width:90px" title="Utilisations"><input id="cdHours" type="number" value="24" min="0" style="width:110px" title="Expiration (h)"><select id="cdBureau"><option value="">— Sans bureau —</option></select><button onclick="createCode()">Générer</button></div>
         <div id="codeOut" class="hide" style="margin-top:12px"></div>
       </div>
-      <div class="card">
-        <h2>Codes existants</h2>
-        <table>
-          <thead><tr><th>Code</th><th>Libellé</th><th>Bureau</th><th>Utilisations</th><th>Expiration</th><th>État</th><th></th></tr></thead>
-          <tbody id="codesBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
-        </table>
+      <div class="card"><h2>Codes existants</h2>
+        <table><thead><tr><th>Code</th><th>Libellé</th><th>Bureau</th><th>Util.</th><th>Expiration</th><th>État</th><th></th></tr></thead>
+        <tbody id="codesBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody></table>
       </div>
     </section>
-
   </main>
 
   <div id="modal" class="modal hide" onclick="if(event.target===this)closeModal()">
-    <div class="box">
-      <h1>Détail du poste <button onclick="closeModal()">Fermer</button></h1>
-      <div id="modalBody"></div>
-    </div>
+    <div class="box"><h1>Détail du poste <button onclick="closeModal()">Fermer</button></h1><div id="modalBody"></div></div>
   </div>
 </div>
 
 <script>
-const State = { key:"", machines:[], bureaus:[] };
-const CMD = { Lock:1, Reboot:2, ShowMessage:3, PrintSummaryTicket:4, AutoLogin:5 };
-const OS = { 0:"Inconnu", 1:"Windows", 2:"macOS", 3:"Linux" };
+const State={key:"",machines:[],bureaus:[]};
+const CMD={Lock:1,Reboot:2,ShowMessage:3,PrintSummaryTicket:4,AutoLogin:5};
+const CMDNAME={0:"—",1:"Verrouiller",2:"Redémarrer",3:"Message",4:"Ticket",5:"Auto-login"};
+const OS={0:"Inconnu",1:"Windows",2:"macOS",3:"Linux"};
+const $=id=>document.getElementById(id);
 
-function toast(msg, err=false){
-  const t=document.createElement("div"); t.className="toast"+(err?" err":""); t.textContent=msg;
-  document.body.appendChild(t); setTimeout(()=>t.remove(), 3500);
-}
-async function api(path, opts={}){
-  opts.headers = Object.assign({ "X-Admin-Key": State.key, "Content-Type":"application/json" }, opts.headers||{});
-  const r = await fetch(path, opts);
-  if (r.status===401) { logout(); throw new Error("Clé refusée."); }
-  if (!r.ok) throw new Error("Erreur "+r.status);
-  return r.status===204 ? null : r.json();
-}
+function toast(m,err=false){const t=document.createElement("div");t.className="toast"+(err?" err":"");t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),3500);}
+async function api(path,opts={}){opts.headers=Object.assign({"X-Admin-Key":State.key,"Content-Type":"application/json"},opts.headers||{});const r=await fetch(path,opts);if(r.status===401){logout();throw new Error("Clé refusée.");}if(!r.ok)throw new Error("Erreur "+r.status);return r.status===204?null:r.json();}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function fmtDur(s){const h=Math.floor(s/3600),m=Math.round((s%3600)/60);return h>0?h+" h "+(m<10?"0":"")+m:m+" min";}
+function durM(m){const h=Math.floor(m/60);return(h>0?h+" h ":"")+((m%60<10&&h>0)?"0":"")+(m%60)+" min";}
+function ago(iso){if(!iso)return"jamais";const s=Math.floor((Date.now()-new Date(iso))/1000);if(s<60)return"il y a "+s+" s";if(s<3600)return"il y a "+Math.floor(s/60)+" min";if(s<86400)return"il y a "+Math.floor(s/3600)+" h";return"il y a "+Math.floor(s/86400)+" j";}
+function bars(items,label,value,max){max=max||Math.max(1,...items.map(value));return items.length?items.map(it=>`<div class="bar"><span>${esc(label(it))}</span><div class="track"><div class="fill" style="width:${Math.round(value(it)*100/max)}%"></div></div><span class="val">${value(it)>=3600||value(it)<60?fmtDur(value(it)):value(it)}</span></div>`).join(""):'<span class="muted">Aucune donnée.</span>';}
 
 async function login(){
-  State.key = document.getElementById("keyInput").value.trim();
-  if (!State.key) return;
-  try {
-    await api("/api/admin/bureaus");               // valide la clé
-    sessionStorage.setItem("remina_key", State.key);
-    document.getElementById("gate").classList.add("hide");
-    document.getElementById("app").classList.remove("hide");
-    const v = await (await fetch("/api/version")).json().catch(()=>null);
-    if (v) document.getElementById("serverVer").textContent = v.version || "";
+  State.key=$("keyInput").value.trim();if(!State.key)return;
+  try{await api("/api/admin/stats");sessionStorage.setItem("remina_key",State.key);
+    $("gate").classList.add("hide");$("shell").classList.remove("hide");
+    const v=await(await fetch("/api/version")).json().catch(()=>null);if(v)$("ver").textContent=v.version||"";
     refresh();
-  } catch(e){ document.getElementById("gateErr").textContent = e.message; }
+  }catch(e){$("gateErr").textContent=e.message;}
 }
-function logout(){
-  sessionStorage.removeItem("remina_key"); State.key="";
-  document.getElementById("app").classList.add("hide");
-  document.getElementById("gate").classList.remove("hide");
-}
-function tab(name){
-  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active", b.dataset.tab===name));
-  ["machines","bureaus","activity","recap","codes"].forEach(n=>document.getElementById("tab-"+n).classList.toggle("hide", n!==name));
-  if(name==="activity") fillActivityMachines();
-  if(name==="recap") initRecap();
-  if(name==="codes") loadCodes();
-}
+function logout(){sessionStorage.removeItem("remina_key");State.key="";$("shell").classList.add("hide");$("gate").classList.remove("hide");}
 
-async function delBureau(id, name){
-  if(!confirm(`Supprimer le bureau « ${name} » ? Les postes seront détachés.`)) return;
-  try { await api("/api/admin/bureaus/"+id,{method:"DELETE"}); toast("Bureau supprimé."); refresh(); }
-  catch(e){ toast(e.message, true); }
-}
-
-async function loadCodes(){
-  const body=document.getElementById("codesBody");
-  try {
-    const codes=await api("/api/admin/enrollment-codes");
-    const bn=id=>{ const b=State.bureaus.find(x=>x.id===id); return b?esc(b.name):'—'; };
-    body.innerHTML = codes.length ? codes.map(c=>`
-      <tr>
-        <td><code>${esc(c.code)}</code></td>
-        <td>${esc(c.label||'—')}</td>
-        <td>${bn(c.bureauId)}</td>
-        <td>${c.remainingUses}</td>
-        <td class="muted">${c.expiresAt?new Date(c.expiresAt).toLocaleString('fr-FR'):'jamais'}</td>
-        <td>${c.usable?'<span class="dot on"></span>actif':(c.isRevoked?'révoqué':'épuisé/expiré')}</td>
-        <td>${c.usable?`<button class="sec" onclick="revokeCode('${c.id}')">Révoquer</button>`:''}</td>
-      </tr>`).join("") : '<tr><td colspan="7" class="muted">Aucun code.</td></tr>';
-  } catch(e){ toast(e.message, true); }
-}
-async function revokeCode(id){
-  try { await api("/api/admin/enrollment-codes/"+id+"/revoke",{method:"POST"}); toast("Code révoqué."); loadCodes(); }
-  catch(e){ toast(e.message, true); }
-}
-
-async function openMachine(id){
-  try {
-    const m=await api("/api/admin/machines/"+id);
-    const today=new Date().toLocaleDateString('en-CA');
-    let act={apps:[]};
-    try { act=await api(`/api/admin/machines/${id}/activity?day=${today}`); } catch(_){}
-    const gb=b=>b?(b/1073741824).toFixed(1)+" Go":"—";
-    const line=(k,v)=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><span class="muted">${k}</span><span>${v}</span></div>`;
-    const actRows = act.apps.length ? act.apps.slice(0,8).map(a=>`<tr><td>${esc(a.app)}</td><td>${fmtDur(a.seconds)}</td></tr>`).join("") : '<tr><td colspan="2" class="muted">Aucune activité aujourd\'hui.</td></tr>';
-    document.getElementById("modalBody").innerHTML=`
-      <div class="row" style="margin-bottom:12px">
-        <input id="mName" value="${esc(m.name)}" style="flex:1">
-        <button onclick="renameMachine('${m.id}')">Renommer</button>
-      </div>
-      ${line('Hôte', esc(m.hostname||'—'))}
-      ${line('OS', (OS[m.os]||'?')+' '+esc(m.osVersion||''))}
-      ${line('Processeur', esc(m.cpuName||'—')+(m.cpuCores?` (${m.cpuCores} cœurs)`:''))}
-      ${line('Mémoire', gb(m.totalRamBytes))}
-      ${line('Adresse MAC', esc(m.primaryMacAddress||'—'))}
-      ${line('Bureau', esc(m.bureauName||'—'))}
-      ${line('Utilisateur', esc(m.currentUser||'—'))}
-      ${line('Version agent', esc(m.agentVersion||'—'))}
-      ${line('Inscrit le', new Date(m.enrolledAt).toLocaleString('fr-FR'))}
-      ${line('ID matériel', '<small class="muted">'+esc(m.hardwareId||'—')+'</small>')}
-      <h2 style="margin-top:16px">Activité du jour</h2>
-      <table><thead><tr><th>Application</th><th>Temps</th></tr></thead><tbody>${actRows}</tbody></table>`;
-    document.getElementById("modal").classList.remove("hide");
-  } catch(e){ toast(e.message, true); }
-}
-function closeModal(){ document.getElementById("modal").classList.add("hide"); }
-async function renameMachine(id){
-  const name=document.getElementById("mName").value.trim();
-  if(!name) return toast("Nom requis.", true);
-  try { await api("/api/admin/machines/"+id,{method:"PATCH",body:JSON.stringify({name})});
-    toast("Poste renommé."); closeModal(); refresh(); } catch(e){ toast(e.message, true); }
-}
-
-function dur(min){ const h=Math.floor(min/60), m=min%60; return (h>0?h+" h ":"")+(m<10&&h>0?"0":"")+m+" min"; }
-function initRecap(){
-  const today=new Date().toLocaleDateString('en-CA');
-  if(!document.getElementById("teDate").value) document.getElementById("teDate").value=today;
-  if(!document.getElementById("teFrom").value) document.getElementById("teFrom").value=today;
-  if(!document.getElementById("teTo").value) document.getElementById("teTo").value=today;
-  loadRecap();
-}
-async function addEntry(){
-  const d=document.getElementById("teDate").value, s=document.getElementById("teStart").value, e=document.getElementById("teEnd").value;
-  if(!document.getElementById("teProject").value.trim()||!d||!s||!e) return toast("Projet, date, début et fin requis.", true);
-  let endD=d;
-  if(new Date(d+"T"+e)<new Date(d+"T"+s)){ const nd=new Date(d); nd.setDate(nd.getDate()+1); endD=nd.toLocaleDateString('en-CA'); }
-  try {
-    await api("/api/admin/time-entries",{method:"POST",body:JSON.stringify({
-      project:document.getElementById("teProject").value.trim(),
-      start:new Date(d+"T"+s).toISOString(), end:new Date(endD+"T"+e).toISOString(),
-      note:document.getElementById("teNote").value.trim()||null, source:"manuel" })});
-    document.getElementById("teNote").value="";
-    toast("Entrée ajoutée."); loadRecap();
-  } catch(err){ toast(err.message, true); }
-}
-async function loadRecap(){
-  const f=document.getElementById("teFrom").value, t=document.getElementById("teTo").value;
-  const qs=[]; if(f) qs.push("from="+f+"T00:00:00"); if(t) qs.push("to="+t+"T23:59:59");
-  const body=document.getElementById("recapBody");
-  try {
-    const r=await api("/api/admin/time-entries"+(qs.length?"?"+qs.join("&"):""));
-    document.getElementById("teTotal").textContent="Total : "+dur(r.totalMinutes);
-    const tm=x=>new Date(x).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-    body.innerHTML = r.entries.length ? r.entries.map(e=>`
-      <tr><td>${esc(e.project)}</td><td class="muted">${tm(e.start)}</td><td class="muted">${tm(e.end)}</td>
-      <td>${dur(e.minutes)}</td><td><span class="tag">${esc(e.source)}</span></td><td class="muted">${esc(e.note||'')}</td>
-      <td><button class="sec" onclick="delEntry('${e.id}')">✕</button></td></tr>`).join("")
-      : '<tr><td colspan="7" class="muted">Aucune entrée sur la période.</td></tr>';
-  } catch(err){ toast(err.message, true); }
-}
-function openTicket(){
-  const day=document.getElementById("teFrom").value || new Date().toLocaleDateString('en-CA');
-  window.open("/recap.html?day="+day, "_blank");
-}
-async function delEntry(id){
-  try { await api("/api/admin/time-entries/"+id,{method:"DELETE"}); toast("Entrée supprimée."); loadRecap(); }
-  catch(e){ toast(e.message, true); }
-}
-
-function fmtDur(sec){
-  const h=Math.floor(sec/3600), m=Math.round((sec%3600)/60);
-  if(h>0) return h+" h "+(m<10?"0":"")+m;
-  return m+" min";
-}
-function fillActivityMachines(){
-  const sel=document.getElementById("actMachine");
-  const cur=sel.value;
-  sel.innerHTML='<option value="">— Choisir un poste —</option>'+
-    State.machines.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
-  if(cur) sel.value=cur;
-  if(!document.getElementById("actDay").value)
-    document.getElementById("actDay").value=new Date().toLocaleDateString('en-CA');
-}
-async function loadActivity(){
-  const id=document.getElementById("actMachine").value;
-  const day=document.getElementById("actDay").value;
-  const body=document.getElementById("activityBody");
-  if(!id){ body.innerHTML='<tr><td colspan="3" class="muted">Choisis un poste.</td></tr>'; return; }
-  try {
-    const r=await api(`/api/admin/machines/${id}/activity`+(day?`?day=${day}`:""));
-    if(!r.apps.length){ body.innerHTML='<tr><td colspan="3" class="muted">Aucune activité ce jour.</td></tr>'; return; }
-    const total=r.apps.reduce((s,a)=>s+a.seconds,0)||1;
-    body.innerHTML=r.apps.map(a=>`<tr><td>${esc(a.app)}</td><td>${fmtDur(a.seconds)}</td><td class="muted">${Math.round(a.seconds*100/total)} %</td></tr>`).join("");
-  } catch(e){ toast(e.message, true); }
+const TITLES={dash:"Tableau de bord",machines:"Postes",bureaus:"Bureaux",activity:"Activité",recap:"Récap",codes:"Codes d'inscription"};
+function nav(v){
+  document.querySelectorAll("#side nav a").forEach(a=>a.classList.toggle("active",a.dataset.v===v));
+  ["dash","machines","bureaus","activity","recap","codes"].forEach(n=>$("v-"+n).classList.toggle("hide",n!==v));
+  $("title").textContent=TITLES[v];
+  if(v==="dash")loadDash();
+  if(v==="activity")fillActivityMachines();
+  if(v==="recap")initRecap();
+  if(v==="codes")loadCodes();
 }
 
 async function refresh(){
-  try {
-    const [m,b] = await Promise.all([ api("/api/admin/machines"), api("/api/admin/bureaus") ]);
-    State.machines=m; State.bureaus=b; renderMachines(); renderBureaus(); fillBureauSelect();
-  } catch(e){ toast(e.message, true); }
+  try{const[m,b]=await Promise.all([api("/api/admin/machines"),api("/api/admin/bureaus")]);
+    State.machines=m;State.bureaus=b;renderMachines();renderBureaus();fillBureauSelect();
+    const active=document.querySelector("#side nav a.active");if(active&&active.dataset.v==="dash")loadDash();
+  }catch(e){toast(e.message,true);}
 }
 
-function ago(iso){
-  if(!iso) return "jamais";
-  const s=Math.floor((Date.now()-new Date(iso))/1000);
-  if(s<60) return "il y a "+s+" s"; if(s<3600) return "il y a "+Math.floor(s/60)+" min";
-  if(s<86400) return "il y a "+Math.floor(s/3600)+" h"; return "il y a "+Math.floor(s/86400)+" j";
+/* DASHBOARD */
+async function loadDash(){
+  try{
+    const s=await api("/api/admin/stats");
+    $("kpis").innerHTML=[
+      {v:s.totalMachines,l:"Postes",sub:s.onlineMachines+" en ligne"},
+      {v:s.bureaus,l:"Bureaux"},
+      {v:s.codesActive,l:"Codes actifs"},
+      {v:fmtDur(s.todayActivitySeconds),l:"Activité aujourd'hui"},
+      {v:durM(s.todayManualMinutes),l:"Temps saisi aujourd'hui"},
+    ].map(k=>`<div class="kpi"><div class="v">${k.v}</div><div class="l">${k.l}</div>${k.sub?`<div class="s">${k.sub}</div>`:""}</div>`).join("");
+    $("topApps").innerHTML=bars(s.topApps,x=>x.app,x=>x.seconds);
+    $("byOs").innerHTML=bars(s.byOs.map(o=>({n:OS[o.os]||"?",c:o.count})),x=>x.n,x=>x.c);
+    const now=Date.now();
+    const recent=[...State.machines].sort((a,b)=>new Date(b.lastSeenAt||0)-new Date(a.lastSeenAt||0)).slice(0,6);
+    $("recentBody").innerHTML=recent.length?recent.map(m=>`<tr><td><span class="dot ${m.online?'on':'off'}"></span>${m.online?'en ligne':'hors ligne'}</td><td><a onclick="openMachine('${m.id}')">${esc(m.name)}</a></td><td>${OS[m.os]||'?'}</td><td>${esc(m.currentUser||'—')}</td><td class="muted">${ago(m.lastSeenAt)}</td></tr>`).join(""):'<tr><td colspan="5" class="muted">Aucun poste.</td></tr>';
+  }catch(e){toast(e.message,true);}
 }
 
+/* MACHINES */
 function renderMachines(){
-  const body=document.getElementById("machinesBody");
-  if(!State.machines.length){ body.innerHTML='<tr><td colspan="7" class="muted">Aucun poste inscrit.</td></tr>'; return; }
-  const opts = '<option value="">— Aucun —</option>' +
-    State.bureaus.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("");
-  body.innerHTML = State.machines.map(m=>`
-    <tr>
-      <td><span class="dot ${m.online?'on':'off'}"></span>${m.online?'en ligne':'hors ligne'}
-          ${m.remoteSessionActive?'<span class="tag rdp">RDP</span>':''}</td>
-      <td><a href="#" onclick="openMachine('${m.id}');return false" style="color:var(--accent);text-decoration:none">${esc(m.name)}</a></td>
-      <td>${OS[m.os]||'?'}</td>
-      <td>${esc(m.currentUser||'—')}</td>
-      <td><select onchange="assignBureau('${m.id}', this.value)">${opts.replace('value="'+(m.bureauId||'')+'"','value="'+(m.bureauId||'')+'" selected')}</select></td>
-      <td class="muted">${ago(m.lastSeenAt)}</td>
-      <td class="row">
-        <button class="sec" onclick="cmd('${m.id}',${CMD.Lock})">Verrouiller</button>
-        <button class="sec" onclick="cmd('${m.id}',${CMD.Reboot})">Redémarrer</button>
-        <button class="sec" onclick="msgCmd('${m.id}')">Message</button>
-        <button class="sec" onclick="cmd('${m.id}',${CMD.PrintSummaryTicket})">Ticket</button>
-        <button class="sec" onclick="delMachine('${m.id}','${esc(m.name)}')" title="Supprimer le poste">✕</button>
-      </td>
-    </tr>`).join("");
+  const body=$("machinesBody");const q=($("search")?.value||"").toLowerCase();
+  const list=State.machines.filter(m=>!q||m.name.toLowerCase().includes(q)||(m.currentUser||"").toLowerCase().includes(q)||(m.bureauName||"").toLowerCase().includes(q));
+  if($("machCount"))$("machCount").textContent=list.length+" / "+State.machines.length;
+  if(!list.length){body.innerHTML='<tr><td colspan="7" class="muted">Aucun poste.</td></tr>';return;}
+  const opts='<option value="">— Aucun —</option>'+State.bureaus.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("");
+  body.innerHTML=list.map(m=>`<tr>
+    <td><span class="dot ${m.online?'on':'off'}"></span>${m.online?'en ligne':'hors ligne'} ${m.remoteSessionActive?'<span class="tag rdp">RDP</span>':''}</td>
+    <td><a onclick="openMachine('${m.id}')">${esc(m.name)}</a></td>
+    <td>${OS[m.os]||'?'}</td><td>${esc(m.currentUser||'—')}</td>
+    <td><select onchange="assignBureau('${m.id}',this.value)">${opts.replace('value="'+(m.bureauId||'')+'"','value="'+(m.bureauId||'')+'" selected')}</select></td>
+    <td class="muted">${ago(m.lastSeenAt)}</td>
+    <td class="row">
+      <button class="sec" onclick="cmd('${m.id}',${CMD.Lock})">Verrouiller</button>
+      <button class="sec" onclick="cmd('${m.id}',${CMD.Reboot})">Redémarrer</button>
+      <button class="sec" onclick="msgCmd('${m.id}')">Message</button>
+      <button class="sec" onclick="cmd('${m.id}',${CMD.PrintSummaryTicket})">Ticket</button>
+      <button class="danger" onclick="delMachine('${m.id}','${esc(m.name)}')">✕</button>
+    </td></tr>`).join("");
 }
-function renderBureaus(){
-  const body=document.getElementById("bureausBody");
-  if(!State.bureaus.length){ body.innerHTML='<tr><td colspan="4" class="muted">Aucun bureau.</td></tr>'; return; }
-  body.innerHTML = State.bureaus.map(b=>`
-    <tr><td>${esc(b.name)}</td><td>${esc(b.location||'—')}</td><td class="muted">${esc(b.description||'')}</td><td>${b.machineCount}</td>
-    <td><button class="sec" onclick="delBureau('${b.id}','${esc(b.name)}')">✕</button></td></tr>`).join("");
-}
-function fillBureauSelect(){
-  document.getElementById("cdBureau").innerHTML =
-    '<option value="">— Sans bureau —</option>' +
-    State.bureaus.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("");
-}
+async function assignBureau(id,b){try{await api(`/api/admin/machines/${id}/bureau`,{method:"POST",body:JSON.stringify({bureauId:b||null})});toast("Rattaché.");refresh();}catch(e){toast(e.message,true);}}
+async function cmd(id,type,payload=null){try{await api(`/api/admin/machines/${id}/commands`,{method:"POST",body:JSON.stringify({type,payload})});toast("Commande envoyée.");}catch(e){toast(e.message,true);}}
+function msgCmd(id){const t=prompt("Message à afficher :");if(t)cmd(id,CMD.ShowMessage,t);}
+async function delMachine(id,name){if(!confirm(`Supprimer « ${name} » et son activité ?`))return;try{await api("/api/admin/machines/"+id,{method:"DELETE"});toast("Supprimé.");refresh();}catch(e){toast(e.message,true);}}
 
-async function createBureau(){
-  const name=document.getElementById("buName").value.trim();
-  if(!name) return toast("Nom requis.", true);
-  try {
-    await api("/api/admin/bureaus",{method:"POST",body:JSON.stringify({
-      name, location:document.getElementById("buLoc").value.trim()||null,
-      description:document.getElementById("buDesc").value.trim()||null })});
-    document.getElementById("buName").value=document.getElementById("buLoc").value=document.getElementById("buDesc").value="";
-    toast("Bureau créé."); refresh();
-  } catch(e){ toast(e.message, true); }
+async function openMachine(id){
+  try{
+    const m=await api("/api/admin/machines/"+id);
+    const today=new Date().toLocaleDateString('en-CA');
+    let act={apps:[]},hist=[];
+    try{act=await api(`/api/admin/machines/${id}/activity?day=${today}`);}catch(_){}
+    try{hist=await api(`/api/admin/machines/${id}/commands`);}catch(_){}
+    const gb=b=>b?(b/1073741824).toFixed(1)+" Go":"—";
+    const kv=(k,v)=>`<div class="kv"><span class="muted">${k}</span><span>${v}</span></div>`;
+    const actBars=act.apps.length?bars(act.apps.slice(0,8),x=>x.app,x=>x.seconds):'<span class="muted">Aucune activité aujourd\'hui.</span>';
+    const histRows=hist.length?hist.map(c=>`<tr><td>${CMDNAME[c.type]||c.type}</td><td class="muted">${new Date(c.createdAt).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td><td>${c.deliveredAt?'<span class="dot on"></span>livrée':'<span class="dot off"></span>en file'}</td><td class="muted">${esc(c.preview||'')}</td></tr>`).join(""):'<tr><td colspan="4" class="muted">Aucune commande.</td></tr>';
+    $("modalBody").innerHTML=`
+      <div class="row" style="margin-bottom:12px"><input id="mName" value="${esc(m.name)}" style="flex:1"><button onclick="renameMachine('${m.id}')">Renommer</button></div>
+      ${kv('État',(m.online?'<span class="dot on"></span>en ligne':'<span class="dot off"></span>hors ligne')+(m.remoteSessionActive?' <span class="tag rdp">RDP</span>':''))}
+      ${kv('Hôte',esc(m.hostname||'—'))}
+      ${kv('OS',(OS[m.os]||'?')+' '+esc(m.osVersion||''))}
+      ${kv('Processeur',esc(m.cpuName||'—')+(m.cpuCores?` (${m.cpuCores} cœurs)`:''))}
+      ${kv('Mémoire',gb(m.totalRamBytes))}
+      ${kv('Adresse MAC',esc(m.primaryMacAddress||'—'))}
+      ${kv('Bureau',esc(m.bureauName||'—'))}
+      ${kv('Utilisateur',esc(m.currentUser||'—'))}
+      ${kv('Version agent',esc(m.agentVersion||'—'))}
+      ${kv('Inscrit le',new Date(m.enrolledAt).toLocaleString('fr-FR'))}
+      ${kv('ID matériel','<small class="muted">'+esc(m.hardwareId||'—')+'</small>')}
+      <h2 style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Activité du jour</h2>
+      <div class="bars">${actBars}</div>
+      <h2 style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Dernières commandes</h2>
+      <table><thead><tr><th>Type</th><th>Envoyée</th><th>Statut</th><th>Détail</th></tr></thead><tbody>${histRows}</tbody></table>`;
+    $("modal").classList.remove("hide");
+  }catch(e){toast(e.message,true);}
 }
-async function assignBureau(id, bureauId){
-  try { await api(`/api/admin/machines/${id}/bureau`,{method:"POST",body:JSON.stringify({bureauId:bureauId||null})});
-    toast("Poste rattaché."); refresh(); } catch(e){ toast(e.message, true); }
-}
-async function cmd(id, type, payload=null){
-  try { await api(`/api/admin/machines/${id}/commands`,{method:"POST",body:JSON.stringify({type,payload})});
-    toast("Commande envoyée."); } catch(e){ toast(e.message, true); }
-}
-function msgCmd(id){ const t=prompt("Message à afficher sur le poste :"); if(t) cmd(id, CMD.ShowMessage, t); }
-async function delMachine(id, name){
-  if(!confirm(`Supprimer le poste « ${name} » et son activité ?`)) return;
-  try { await api("/api/admin/machines/"+id,{method:"DELETE"}); toast("Poste supprimé."); refresh(); }
-  catch(e){ toast(e.message, true); }
-}
+function closeModal(){$("modal").classList.add("hide");}
+async function renameMachine(id){const name=$("mName").value.trim();if(!name)return toast("Nom requis.",true);try{await api("/api/admin/machines/"+id,{method:"PATCH",body:JSON.stringify({name})});toast("Renommé.");closeModal();refresh();}catch(e){toast(e.message,true);}}
 
-async function createCode(){
-  try {
-    const r = await api("/api/admin/enrollment-codes",{method:"POST",body:JSON.stringify({
-      label:document.getElementById("cdLabel").value.trim()||null,
-      maxUses:parseInt(document.getElementById("cdUses").value)||1,
-      expiresInHours:parseInt(document.getElementById("cdHours").value)||0,
-      bureauId:document.getElementById("cdBureau").value||null })});
-    const out=document.getElementById("codeOut"); out.classList.remove("hide");
-    out.innerHTML = `Code : <code style="font-size:16px">${esc(r.code)}</code> — ${r.remainingUses} utilisation(s)` +
-      (r.expiresAt?`, expire le ${new Date(r.expiresAt).toLocaleString('fr-FR')}`:", sans expiration");
-    toast("Code généré.");
-  } catch(e){ toast(e.message, true); }
-}
+/* BUREAUS */
+function renderBureaus(){const b=$("bureausBody");if(!State.bureaus.length){b.innerHTML='<tr><td colspan="5" class="muted">Aucun bureau.</td></tr>';return;}
+  b.innerHTML=State.bureaus.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.location||'—')}</td><td class="muted">${esc(x.description||'')}</td><td>${x.machineCount}</td><td><button class="danger" onclick="delBureau('${x.id}','${esc(x.name)}')">✕</button></td></tr>`).join("");}
+function fillBureauSelect(){$("cdBureau").innerHTML='<option value="">— Sans bureau —</option>'+State.bureaus.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("");}
+async function createBureau(){const name=$("buName").value.trim();if(!name)return toast("Nom requis.",true);try{await api("/api/admin/bureaus",{method:"POST",body:JSON.stringify({name,location:$("buLoc").value.trim()||null,description:$("buDesc").value.trim()||null})});$("buName").value=$("buLoc").value=$("buDesc").value="";toast("Créé.");refresh();}catch(e){toast(e.message,true);}}
+async function delBureau(id,name){if(!confirm(`Supprimer le bureau « ${name} » ? Les postes seront détachés.`))return;try{await api("/api/admin/bureaus/"+id,{method:"DELETE"});toast("Supprimé.");refresh();}catch(e){toast(e.message,true);}}
 
-function esc(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+/* ACTIVITY */
+function fillActivityMachines(){const sel=$("actMachine"),cur=sel.value;sel.innerHTML='<option value="">— Choisir un poste —</option>'+State.machines.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");if(cur)sel.value=cur;if(!$("actDay").value)$("actDay").value=new Date().toLocaleDateString('en-CA');}
+async function loadActivity(){const id=$("actMachine").value,day=$("actDay").value;const box=$("actBars");if(!id){box.innerHTML='<span class="muted">Choisis un poste.</span>';return;}
+  try{const r=await api(`/api/admin/machines/${id}/activity`+(day?`?day=${day}`:""));box.innerHTML=r.apps.length?bars(r.apps,x=>x.app,x=>x.seconds):'<span class="muted">Aucune activité ce jour.</span>';}catch(e){toast(e.message,true);}}
 
-// auto-login si une clé est en session
-window.addEventListener("load", ()=>{
-  const k=sessionStorage.getItem("remina_key");
-  if(k){ document.getElementById("keyInput").value=k; login(); }
-});
-// rafraîchissement auto des postes toutes les 20 s
-setInterval(()=>{ if(State.key && !document.getElementById("app").classList.contains("hide")) refresh(); }, 20000);
+/* RECAP */
+function initRecap(){const t=new Date().toLocaleDateString('en-CA');if(!$("teDate").value)$("teDate").value=t;if(!$("teFrom").value)$("teFrom").value=t;if(!$("teTo").value)$("teTo").value=t;loadRecap();}
+async function addEntry(){const d=$("teDate").value,s=$("teStart").value,e=$("teEnd").value;if(!$("teProject").value.trim()||!d||!s||!e)return toast("Projet, date, début et fin requis.",true);let ed=d;if(new Date(d+"T"+e)<new Date(d+"T"+s)){const nd=new Date(d);nd.setDate(nd.getDate()+1);ed=nd.toLocaleDateString('en-CA');}try{await api("/api/admin/time-entries",{method:"POST",body:JSON.stringify({project:$("teProject").value.trim(),start:new Date(d+"T"+s).toISOString(),end:new Date(ed+"T"+e).toISOString(),note:$("teNote").value.trim()||null,source:"manuel"})});$("teNote").value="";toast("Ajouté.");loadRecap();}catch(err){toast(err.message,true);}}
+async function loadRecap(){const f=$("teFrom").value,t=$("teTo").value,qs=[];if(f)qs.push("from="+f+"T00:00:00");if(t)qs.push("to="+t+"T23:59:59");const body=$("recapBody");try{const r=await api("/api/admin/time-entries"+(qs.length?"?"+qs.join("&"):""));$("teTotal").textContent="Total : "+durM(r.totalMinutes);const tm=x=>new Date(x).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});body.innerHTML=r.entries.length?r.entries.map(e=>`<tr><td>${esc(e.project)}</td><td class="muted">${tm(e.start)}</td><td class="muted">${tm(e.end)}</td><td>${durM(e.minutes)}</td><td><span class="tag">${esc(e.source)}</span></td><td class="muted">${esc(e.note||'')}</td><td><button class="danger" onclick="delEntry('${e.id}')">✕</button></td></tr>`).join(""):'<tr><td colspan="7" class="muted">Aucune entrée.</td></tr>';}catch(e){toast(e.message,true);}}
+function openTicket(){const day=$("teFrom").value||new Date().toLocaleDateString('en-CA');window.open("/recap.html?day="+day,"_blank");}
+async function delEntry(id){try{await api("/api/admin/time-entries/"+id,{method:"DELETE"});toast("Supprimée.");loadRecap();}catch(e){toast(e.message,true);}}
+
+/* CODES */
+async function createCode(){try{const r=await api("/api/admin/enrollment-codes",{method:"POST",body:JSON.stringify({label:$("cdLabel").value.trim()||null,maxUses:parseInt($("cdUses").value)||1,expiresInHours:parseInt($("cdHours").value)||0,bureauId:$("cdBureau").value||null})});const o=$("codeOut");o.classList.remove("hide");o.innerHTML=`Code : <code style="font-size:16px">${esc(r.code)}</code> — ${r.remainingUses} utilisation(s)`+(r.expiresAt?`, expire le ${new Date(r.expiresAt).toLocaleString('fr-FR')}`:", sans expiration");toast("Généré.");loadCodes();}catch(e){toast(e.message,true);}}
+async function loadCodes(){const body=$("codesBody");try{const codes=await api("/api/admin/enrollment-codes");const bn=id=>{const b=State.bureaus.find(x=>x.id===id);return b?esc(b.name):'—';};body.innerHTML=codes.length?codes.map(c=>`<tr><td><code>${esc(c.code)}</code></td><td>${esc(c.label||'—')}</td><td>${bn(c.bureauId)}</td><td>${c.remainingUses}</td><td class="muted">${c.expiresAt?new Date(c.expiresAt).toLocaleString('fr-FR'):'jamais'}</td><td>${c.usable?'<span class="dot on"></span>actif':(c.isRevoked?'révoqué':'épuisé')}</td><td>${c.usable?`<button class="danger" onclick="revokeCode('${c.id}')">Révoquer</button>`:''}</td></tr>`).join(""):'<tr><td colspan="7" class="muted">Aucun code.</td></tr>';}catch(e){toast(e.message,true);}}
+async function revokeCode(id){try{await api("/api/admin/enrollment-codes/"+id+"/revoke",{method:"POST"});toast("Révoqué.");loadCodes();}catch(e){toast(e.message,true);}}
+
+setInterval(()=>{if(State.key&&!$("shell").classList.contains("hide"))refresh();},20000);
+window.addEventListener("load",()=>{const k=sessionStorage.getItem("remina_key");if(k){$("keyInput").value=k;login();}});
 </script>
 </body>
 </html>
