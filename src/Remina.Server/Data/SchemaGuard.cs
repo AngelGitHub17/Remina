@@ -48,13 +48,24 @@ public static class SchemaGuard
                 ""SilentArgs"" TEXT NULL,
                 ""SizeBytes"" INTEGER NOT NULL,
                 ""UploadedAt"" TEXT NOT NULL);",
+
+            @"CREATE TABLE IF NOT EXISTS ""Inventory"" (
+                ""Id"" TEXT NOT NULL CONSTRAINT ""PK_Inventory"" PRIMARY KEY,
+                ""MachineId"" TEXT NOT NULL,
+                ""Name"" TEXT NOT NULL,
+                ""Version"" TEXT NULL);",
+            @"CREATE INDEX IF NOT EXISTS ""IX_Inventory_MachineId"" ON ""Inventory"" (""MachineId"");",
         };
 
         foreach (var s in sql)
             db.Database.ExecuteSqlRaw(s);
 
-        // Colonne ajoutée à une table existante : ALTER échoue si elle existe déjà → on ignore.
+        // Colonnes ajoutées à des tables existantes : ALTER échoue si déjà présentes → on ignore.
         TryExec(db, @"ALTER TABLE ""Machines"" ADD COLUMN ""BureauId"" TEXT NULL;");
+        TryExec(db, @"ALTER TABLE ""AgentCommands"" ADD COLUMN ""Success"" INTEGER NULL;");
+        TryExec(db, @"ALTER TABLE ""AgentCommands"" ADD COLUMN ""ExitCode"" INTEGER NULL;");
+        TryExec(db, @"ALTER TABLE ""AgentCommands"" ADD COLUMN ""ResultMessage"" TEXT NULL;");
+        TryExec(db, @"ALTER TABLE ""AgentCommands"" ADD COLUMN ""CompletedAt"" TEXT NULL;");
     }
 
     private static void TryExec(ReminaDbContext db, string sql)

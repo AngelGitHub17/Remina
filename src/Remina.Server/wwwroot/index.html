@@ -254,16 +254,20 @@ async function loadPackages(){
   try{
     const pkgs=await api("/api/admin/packages");
     const mopts=State.machines.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
+    const bopts=State.bureaus.map(b=>`<option value="b:${b.id}">${esc(b.name)}</option>`).join("");
     body.innerHTML=pkgs.length?pkgs.map(p=>`<tr>
       <td>${esc(p.name)}</td><td class="muted">${esc(p.fileName)}</td><td>${OS[p.os]||'?'}</td><td class="muted">${fmtSize(p.sizeBytes)}</td>
-      <td><select id="dep-${p.id}"><option value="">— Poste —</option>${mopts}</select></td>
+      <td><select id="dep-${p.id}"><option value="">— Cible —</option><optgroup label="Postes">${mopts}</optgroup><optgroup label="Bureaux">${bopts}</optgroup></select></td>
       <td class="row"><button class="sec" onclick="deployPackage('${p.id}')">Déployer</button><button class="danger" onclick="delPackage('${p.id}','${esc(p.name)}')">✕</button></td>
     </tr>`).join(""):'<tr><td colspan="6" class="muted">Aucun logiciel. Téléverse un installeur ci-dessus.</td></tr>';
   }catch(e){toast(e.message,true);}
 }
 async function deployPackage(pid){
-  const mid=$("dep-"+pid).value;if(!mid)return toast("Choisis un poste.",true);
-  try{await api(`/api/admin/machines/${mid}/deploy`,{method:"POST",body:JSON.stringify({packageId:pid})});toast("Déploiement envoyé au poste.");}catch(e){toast(e.message,true);}
+  const v=$("dep-"+pid).value;if(!v)return toast("Choisis une cible.",true);
+  try{
+    if(v.startsWith("b:")){const r=await api(`/api/admin/bureaus/${v.slice(2)}/deploy`,{method:"POST",body:JSON.stringify({packageId:pid})});toast(`Déploiement envoyé (${r.deployed} poste(s)).`);}
+    else{await api(`/api/admin/machines/${v}/deploy`,{method:"POST",body:JSON.stringify({packageId:pid})});toast("Déploiement envoyé au poste.");}
+  }catch(e){toast(e.message,true);}
 }
 async function delPackage(id,name){if(!confirm(`Supprimer le logiciel « ${name} » ?`))return;try{await api("/api/admin/packages/"+id,{method:"DELETE"});toast("Supprimé.");loadPackages();}catch(e){toast(e.message,true);}}
 
@@ -323,15 +327,18 @@ async function openMachine(id){
   try{
     const m=await api("/api/admin/machines/"+id);
     const today=new Date().toLocaleDateString('en-CA');
-    let act={apps:[]},hist=[];
+    let act={apps:[]},hist=[],soft=[];
     try{act=await api(`/api/admin/machines/${id}/activity?day=${today}`);}catch(_){}
     try{hist=await api(`/api/admin/machines/${id}/commands`);}catch(_){}
+    try{soft=await api(`/api/admin/machines/${id}/software`);}catch(_){}
     const gb=b=>b?(b/1073741824).toFixed(1)+" Go":"—";
     const kv=(k,v)=>`<div class="kv"><span class="muted">${k}</span><span>${v}</span></div>`;
     const actBars=act.apps.length?bars(act.apps.slice(0,8),x=>x.app,x=>x.seconds):'<span class="muted">Aucune activité aujourd\'hui.</span>';
-    const histRows=hist.length?hist.map(c=>`<tr><td>${CMDNAME[c.type]||c.type}</td><td class="muted">${new Date(c.createdAt).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td><td>${c.deliveredAt?'<span class="dot on"></span>livrée':'<span class="dot off"></span>en file'}</td><td class="muted">${esc(c.preview||'')}</td></tr>`).join(""):'<tr><td colspan="4" class="muted">Aucune commande.</td></tr>';
+    const res=c=>c.completedAt?(c.success?'<span class="dot on"></span>OK':'<span class="dot off"></span>échec'+(c.exitCode!=null?` (${c.exitCode})`:'')):'—';
+    const histRows=hist.length?hist.map(c=>`<tr><td>${CMDNAME[c.type]||c.type}</td><td class="muted">${new Date(c.createdAt).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td><td>${c.deliveredAt?'<span class="dot on"></span>livrée':'<span class="dot off"></span>en file'}</td><td>${res(c)}</td><td class="muted">${esc(c.preview||'')}</td></tr>`).join(""):'<tr><td colspan="5" class="muted">Aucune commande.</td></tr>';
+    const softRows=soft.length?soft.map(s=>`<tr><td>${esc(s.name)}</td><td class="muted">${esc(s.version||'')}</td></tr>`).join(""):'<tr><td colspan="2" class="muted">Pas encore d\'inventaire.</td></tr>';
     $("modalBody").innerHTML=`
-      <div class="row" style="margin-bottom:12px"><input id="mName" value="${esc(m.name)}" style="flex:1"><button onclick="renameMachine('${m.id}')">Renommer</button></div>
+      <div class="row" style="margin-bottom:12px"><input id="mName" value="${esc(m.name)}" style="flex:1"><button onclick="renameMachine('${m.id}')">Renommer</button><button class="sec" onclick="wake('${m.id}')">Réveiller (WoL)</button></div>
       ${kv('État',(m.online?'<span class="dot on"></span>en ligne':'<span class="dot off"></span>hors ligne')+(m.remoteSessionActive?' <span class="tag rdp">RDP</span>':''))}
       ${kv('Hôte',esc(m.hostname||'—'))}
       ${kv('OS',(OS[m.os]||'?')+' '+esc(m.osVersion||''))}
@@ -346,12 +353,15 @@ async function openMachine(id){
       <h2 style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Activité du jour</h2>
       <div class="bars">${actBars}</div>
       <h2 style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Dernières commandes</h2>
-      <table><thead><tr><th>Type</th><th>Envoyée</th><th>Statut</th><th>Détail</th></tr></thead><tbody>${histRows}</tbody></table>`;
+      <table><thead><tr><th>Type</th><th>Envoyée</th><th>Statut</th><th>Résultat</th><th>Détail</th></tr></thead><tbody>${histRows}</tbody></table>
+      <h2 style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Logiciels installés ${soft.length?`(${soft.length})`:''}</h2>
+      <div style="max-height:220px;overflow:auto"><table><thead><tr><th>Nom</th><th>Version</th></tr></thead><tbody>${softRows}</tbody></table></div>`;
     $("modal").classList.remove("hide");
   }catch(e){toast(e.message,true);}
 }
 function closeModal(){$("modal").classList.add("hide");}
 async function renameMachine(id){const name=$("mName").value.trim();if(!name)return toast("Nom requis.",true);try{await api("/api/admin/machines/"+id,{method:"PATCH",body:JSON.stringify({name})});toast("Renommé.");closeModal();refresh();}catch(e){toast(e.message,true);}}
+async function wake(id){try{await api("/api/admin/machines/"+id+"/wake",{method:"POST"});toast("Paquet de réveil envoyé.");}catch(e){toast(e.message,true);}}
 
 /* BUREAUS */
 function renderBureaus(){const b=$("bureausBody");if(!State.bureaus.length){b.innerHTML='<tr><td colspan="5" class="muted">Aucun bureau.</td></tr>';return;}

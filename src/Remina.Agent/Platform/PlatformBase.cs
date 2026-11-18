@@ -88,6 +88,25 @@ public abstract class PlatformBase : IPlatform
     public virtual bool ConfigureAutoLogin(string user, string password, string? domain) => false;
     public virtual bool DisableAutoLogin() => false;
 
+    // Inventaire logiciel : surchargé par OS.
+    public virtual IReadOnlyList<InventorySoftware> GetInstalledSoftware() => Array.Empty<InventorySoftware>();
+
+    /// <summary>Lance un processus et renvoie sa sortie standard (vide en cas d'échec).</summary>
+    protected static string RunCapture(string file, string args, int timeoutMs = 8000)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo(file, args)
+            { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
+            using var p = Process.Start(psi);
+            if (p is null) return "";
+            var o = p.StandardOutput.ReadToEnd();
+            p.WaitForExit(timeoutMs);
+            return o;
+        }
+        catch { return ""; }
+    }
+
     /// <summary>Lance un processus sans fenêtre, sans attendre, en avalant les erreurs.</summary>
     protected static void Run(string file, params string[] args)
     {

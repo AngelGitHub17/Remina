@@ -13,6 +13,7 @@ public class ReminaDbContext : DbContext
     public DbSet<ActivityAggregate> Activity => Set<ActivityAggregate>();
     public DbSet<ManualTimeEntry> TimeEntries => Set<ManualTimeEntry>();
     public DbSet<Package> Packages => Set<Package>();
+    public DbSet<InventoryItem> Inventory => Set<InventoryItem>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

@@ -183,6 +183,7 @@ public static class AdminEndpoints
                 .Select(c => new
                 {
                     c.Id, c.Type, c.CreatedAt, c.DeliveredAt,
+                    c.Success, c.ExitCode, c.CompletedAt,
                     Preview = c.Type == AgentCommandType.ShowMessage
                         ? (c.Payload ?? "") : (c.Payload != null ? "(contenu)" : null),
                 }).ToList();
@@ -339,6 +340,30 @@ public static class AdminEndpoints
                 BureauName = m.Bureau != null ? m.Bureau.Name : null,
                 Online = m.LastSeenAt != null && m.LastSeenAt > now.AddMinutes(-2),
             });
+        });
+
+        // Inventaire logiciel d'un poste.
+        g.MapGet("/machines/{id:guid}/software", async (
+            Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            var items = await db.Inventory.Where(i => i.MachineId == id)
+                .OrderBy(i => i.Name)
+                .Select(i => new { i.Name, i.Version }).ToListAsync();
+            return Results.Ok(items);
+        });
+
+        // Wake-on-LAN : envoie un paquet magique au poste (même réseau L2 que le serveur).
+        g.MapPost("/machines/{id:guid}/wake", async (
+            Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
+        {
+            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
+            var m = await db.Machines.FindAsync(id);
+            if (m is null) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(m.PrimaryMacAddress))
+                return Results.BadRequest(new { error = "Adresse MAC du poste inconnue." });
+            var sent = Services.WakeOnLan.Send(m.PrimaryMacAddress!);
+            return sent ? Results.Ok() : Results.BadRequest(new { error = "Adresse MAC invalide." });
         });
 
         // Renommer un poste.

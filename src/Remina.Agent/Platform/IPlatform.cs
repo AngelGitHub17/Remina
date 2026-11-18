@@ -54,4 +54,7 @@ public interface IPlatform
 
     /// <summary>Désactive la connexion de session automatique.</summary>
     bool DisableAutoLogin();
+
+    /// <summary>Liste des logiciels installés (nom + version) pour l'inventaire.</summary>
+    IReadOnlyList<InventorySoftware> GetInstalledSoftware();
 }

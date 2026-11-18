@@ -143,6 +143,40 @@ public static class AgentEndpoints
             await db.SaveChangesAsync();
             return Results.Ok();
         });
+
+        // Inventaire logiciel : remplace la liste existante du poste. Jeton d'agent requis.
+        g.MapPost("/inventory", async (InventoryReport report, HttpContext http, ReminaDbContext db) =>
+        {
+            var token = http.Request.Headers["X-Agent-Token"].ToString();
+            var machine = await db.Machines.FirstOrDefaultAsync(m => m.Id == report.MachineId);
+            if (machine is null || string.IsNullOrEmpty(token) || !TokenService.Verify(token, machine.AgentTokenHash))
+                return Results.Unauthorized();
+
+            var old = db.Inventory.Where(i => i.MachineId == report.MachineId);
+            db.Inventory.RemoveRange(old);
+            foreach (var it in report.Items.Where(i => !string.IsNullOrWhiteSpace(i.Name)).Take(2000))
+                db.Inventory.Add(new InventoryItem { MachineId = report.MachineId, Name = it.Name, Version = it.Version });
+            await db.SaveChangesAsync();
+            return Results.Ok();
+        });
+
+        // Résultat d'une commande (ex : installation) : met à jour l'enregistrement.
+        g.MapPost("/command-result", async (CommandResult res, HttpContext http, ReminaDbContext db) =>
+        {
+            var token = http.Request.Headers["X-Agent-Token"].ToString();
+            var machine = await db.Machines.FirstOrDefaultAsync(m => m.Id == res.MachineId);
+            if (machine is null || string.IsNullOrEmpty(token) || !TokenService.Verify(token, machine.AgentTokenHash))
+                return Results.Unauthorized();
+
+            var cmd = await db.AgentCommands.FirstOrDefaultAsync(c => c.Id == res.CommandId && c.MachineId == res.MachineId);
+            if (cmd is null) return Results.NotFound();
+            cmd.Success = res.Success;
+            cmd.ExitCode = res.ExitCode;
+            cmd.ResultMessage = res.Message;
+            cmd.CompletedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+            return Results.Ok();
+        });
     }
 
     private static void ApplyInventory(Machine m, MachineInventory inv)

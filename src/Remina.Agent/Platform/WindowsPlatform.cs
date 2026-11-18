@@ -63,6 +63,36 @@ public sealed class WindowsPlatform : PlatformBase
         catch { return null; }
     }
 
+    public override IReadOnlyList<InventorySoftware> GetInstalledSoftware()
+    {
+        if (!OperatingSystem.IsWindows()) return base.GetInstalledSoftware();
+        var list = new List<InventorySoftware>();
+        try
+        {
+            var psi = new ProcessStartInfo("powershell")
+            { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
+            psi.ArgumentList.Add("-NoProfile");
+            psi.ArgumentList.Add("-Command");
+            psi.ArgumentList.Add(
+                "Get-ItemProperty 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' " +
+                "| Where-Object { $_.DisplayName } | ForEach-Object { \"$($_.DisplayName)`t$($_.DisplayVersion)\" }");
+            using var p = Process.Start(psi);
+            if (p is null) return list;
+            var o = p.StandardOutput.ReadToEnd();
+            p.WaitForExit(15000);
+            var seen = new HashSet<string>();
+            foreach (var line in o.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Split('\t');
+                var name = parts[0].Trim();
+                if (name.Length == 0 || !seen.Add(name)) continue;
+                list.Add(new InventorySoftware { Name = name, Version = parts.Length > 1 ? parts[1].Trim() : null });
+            }
+        }
+        catch { }
+        return list;
+    }
+
     public override (string App, string? Title)? GetForegroundApp()
     {
         if (!OperatingSystem.IsWindows()) return null;

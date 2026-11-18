@@ -42,4 +42,17 @@ public sealed class MacPlatform : PlatformBase
     }
 
     // Note : le suivi d'activité détaillé réclamera l'autorisation d'accessibilité macOS.
+
+    public override IReadOnlyList<InventorySoftware> GetInstalledSoftware()
+    {
+        // Applications du dossier /Applications (versions non triviales à extraire ici).
+        var list = new List<InventorySoftware>();
+        try
+        {
+            foreach (var dir in Directory.GetDirectories("/Applications", "*.app"))
+                list.Add(new InventorySoftware { Name = Path.GetFileNameWithoutExtension(dir) });
+        }
+        catch { }
+        return list;
+    }
 }

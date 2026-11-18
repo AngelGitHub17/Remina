@@ -37,4 +37,25 @@ public sealed class LinuxPlatform : PlatformBase
 
     // Détection RDP : non pertinente sur Linux (pas de RDP natif).
     // L'inactivité sous Wayland nécessitera une extension de bureau : faux pour la v0.
+
+    public override IReadOnlyList<InventorySoftware> GetInstalledSoftware()
+    {
+        // Debian/Ubuntu via dpkg, sinon RPM.
+        var o = RunCapture("dpkg-query", "-W -f=${Package}\\t${Version}\\n");
+        if (string.IsNullOrWhiteSpace(o))
+            o = RunCapture("rpm", "-qa --qf %{NAME}\\t%{VERSION}\\n");
+        return Parse(o);
+    }
+
+    private static List<InventorySoftware> Parse(string output)
+    {
+        var list = new List<InventorySoftware>();
+        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = line.Split('\t');
+            if (parts.Length >= 1 && parts[0].Trim().Length > 0)
+                list.Add(new InventorySoftware { Name = parts[0].Trim(), Version = parts.Length > 1 ? parts[1].Trim() : null });
+        }
+        return list;
+    }
 }

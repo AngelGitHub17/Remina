@@ -81,6 +81,9 @@ public class AgentWorker : BackgroundService
         var updateEvery = TimeSpan.FromHours(_cfg.GetValue("Remina:Update:CheckHours", 6));
         var nextUpdateCheck = DateTimeOffset.UtcNow.AddMinutes(1); // première vérif après 1 min
 
+        var inventoryEnabled = _cfg.GetValue("Remina:Inventory:Enabled", true);
+        var nextInventory = DateTimeOffset.UtcNow; // inventaire dès le premier passage
+
         while (!ct.IsCancellationRequested)
         {
             try
@@ -89,6 +92,12 @@ public class AgentWorker : BackgroundService
                 {
                     nextUpdateCheck = DateTimeOffset.UtcNow + updateEvery;
                     await TrySelfUpdateAsync(ct); // ne revient pas si une mise à jour s'applique
+                }
+
+                if (inventoryEnabled && _state.IsEnrolled && DateTimeOffset.UtcNow >= nextInventory)
+                {
+                    nextInventory = DateTimeOffset.UtcNow + TimeSpan.FromHours(24);
+                    _ = Task.Run(() => ReportInventoryAsync(ct));
                 }
 
                 var remote = _platform.IsRemoteSessionActive();
@@ -338,14 +347,15 @@ public class AgentWorker : BackgroundService
                     : "Échec de la configuration auto-login (droits administrateur requis ?).");
                 break;
             case AgentCommandType.InstallPackage:
-                _ = Task.Run(() => InstallPackageAsync(cmd.Payload));
+                _ = Task.Run(() => InstallPackageAsync(cmd.CommandId, cmd.Payload));
                 break;
         }
     }
 
-    /// <summary>Télécharge et installe un paquet en silencieux.</summary>
-    private async Task InstallPackageAsync(string? payloadJson)
+    /// <summary>Télécharge et installe un paquet en silencieux, puis remonte le résultat.</summary>
+    private async Task InstallPackageAsync(Guid commandId, string? payloadJson)
     {
+        var ct = CancellationToken.None;
         try
         {
             var p = JsonSerializer.Deserialize<InstallPayload>(payloadJson ?? "");
@@ -357,19 +367,46 @@ public class AgentWorker : BackgroundService
 
             _log.LogInformation("Déploiement : téléchargement de {Name}…", p.FileName);
             var client = new ServerClient(_serverUrl, TimeSpan.FromMinutes(30));
-            var ok = await client.DownloadPackageAsync(_state.AgentToken, _state.MachineId, p.PackageId, file, CancellationToken.None);
-            if (!ok) { _log.LogWarning("Déploiement : téléchargement échoué."); return; }
+            var ok = await client.DownloadPackageAsync(_state.AgentToken, _state.MachineId, p.PackageId, file, ct);
+            if (!ok)
+            {
+                _log.LogWarning("Déploiement : téléchargement échoué.");
+                await Report(commandId, false, -1, "Téléchargement échoué");
+                return;
+            }
 
             _log.LogInformation("Déploiement : installation de {Name}…", p.FileName);
             var (success, code) = Installer.Install(file, p.SilentArgs);
             if (success) _log.LogInformation("Déploiement réussi : {Name}.", p.FileName);
-            else _log.LogWarning("Déploiement échoué ({Name}), code {Code} (droits admin/root requis ?).", p.FileName, code);
+            else _log.LogWarning("Déploiement échoué ({Name}), code {Code}.", p.FileName, code);
+            await Report(commandId, success, code, success ? "Installé" : "Échec (droits admin/root ?)");
 
             try { Directory.Delete(dir, recursive: true); } catch { }
         }
         catch (Exception ex)
         {
             _log.LogWarning(ex, "Déploiement : erreur.");
+            await Report(commandId, false, -1, ex.Message);
+        }
+
+        async Task Report(Guid id, bool success, int code, string msg) =>
+            await _client.PostCommandResultAsync(_state.AgentToken, new CommandResult
+            { MachineId = _state.MachineId, CommandId = id, Success = success, ExitCode = code, Message = msg }, ct);
+    }
+
+    private async Task ReportInventoryAsync(CancellationToken ct)
+    {
+        try
+        {
+            var items = _platform.GetInstalledSoftware();
+            if (items.Count == 0) return;
+            await _client.PostInventoryAsync(_state.AgentToken,
+                new InventoryReport { MachineId = _state.MachineId, Items = items }, ct);
+            _log.LogInformation("Inventaire logiciel envoyé ({N} entrées).", items.Count);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _log.LogWarning(ex, "Inventaire logiciel : échec.");
         }
     }
 }

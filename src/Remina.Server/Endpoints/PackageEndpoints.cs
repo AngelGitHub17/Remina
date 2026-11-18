@@ -102,6 +102,36 @@ public static class PackageEndpoints
             return Results.Ok(new { cmd.Id });
         });
 
+        // --- Déployer un paquet sur tous les postes d'un bureau ---
+        app.MapPost("/api/admin/bureaus/{bureauId:guid}/deploy", async (
+            Guid bureauId, DeployDto dto, HttpContext http, IConfiguration cfg,
+            ReminaDbContext db, IHubContext<AgentHub> hub) =>
+        {
+            if (!AdminEndpoints.IsAdmin(http, cfg)) return Results.Unauthorized();
+            var pkg = await db.Packages.FindAsync(dto.PackageId);
+            if (pkg is null) return Results.NotFound(new { error = "Paquet inconnu." });
+            var machines = await db.Machines.Where(m => m.BureauId == bureauId).ToListAsync();
+
+            var payload = JsonSerializer.Serialize(new InstallPayload
+            {
+                PackageId = pkg.Id, FileName = pkg.FileName, SilentArgs = pkg.SilentArgs,
+            });
+            foreach (var m in machines)
+            {
+                var cmd = new AgentCommandRecord
+                {
+                    MachineId = m.Id, Type = AgentCommandType.InstallPackage, Payload = payload,
+                };
+                db.AgentCommands.Add(cmd);
+                await db.SaveChangesAsync();
+                await hub.Clients.Group(m.Id.ToString()).SendAsync("command", new AgentCommand
+                {
+                    CommandId = cmd.Id, Type = cmd.Type, Payload = cmd.Payload,
+                });
+            }
+            return Results.Ok(new { deployed = machines.Count });
+        });
+
         // --- Agent : télécharger l'installeur (authentifié par jeton d'agent) ---
         app.MapGet("/api/agent/package/{id:guid}", async (
             Guid id, Guid machineId, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>

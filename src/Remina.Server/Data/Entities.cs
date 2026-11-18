@@ -125,4 +125,19 @@ public class AgentCommandRecord
     public string? Payload { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? DeliveredAt { get; set; }
+
+    // Résultat remonté par l'agent (ex : installation).
+    public bool? Success { get; set; }
+    public int? ExitCode { get; set; }
+    public string? ResultMessage { get; set; }
+    public DateTimeOffset? CompletedAt { get; set; }
+}
+
+/// <summary>Un logiciel installé sur un poste (inventaire).</summary>
+public class InventoryItem
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid MachineId { get; set; }
+    public string Name { get; set; } = "";
+    public string? Version { get; set; }
 }

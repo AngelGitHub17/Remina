@@ -75,6 +75,29 @@ public class ServerClient
         return true;
     }
 
+    /// <summary>Envoie l'inventaire logiciel (remplace l'existant côté serveur).</summary>
+    public async Task<bool> PostInventoryAsync(string token, InventoryReport report, CancellationToken ct)
+    {
+        using var msg = new HttpRequestMessage(HttpMethod.Post, "/api/agent/inventory")
+        { Content = JsonContent.Create(report) };
+        msg.Headers.Add("X-Agent-Token", token);
+        var resp = await _http.SendAsync(msg, ct);
+        return resp.IsSuccessStatusCode;
+    }
+
+    /// <summary>Remonte le résultat d'une commande (ex : installation).</summary>
+    public async Task PostCommandResultAsync(string token, CommandResult result, CancellationToken ct)
+    {
+        try
+        {
+            using var msg = new HttpRequestMessage(HttpMethod.Post, "/api/agent/command-result")
+            { Content = JsonContent.Create(result) };
+            msg.Headers.Add("X-Agent-Token", token);
+            await _http.SendAsync(msg, ct);
+        }
+        catch { }
+    }
+
     /// <summary>HttpClient dédié aux téléchargements (timeout long).</summary>
     public static HttpClient DownloadClient() => new() { Timeout = TimeSpan.FromMinutes(5) };
 }
