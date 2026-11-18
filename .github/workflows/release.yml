@@ -180,6 +180,7 @@ jobs:
               -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out/tray-$rid
             packaging/macos/make-dmg.sh out/tray-$rid ${{ steps.ver.outputs.v }} "$arch"
             mv Remina-Agent-GUI-*.dmg dist/
+            rm -rf out/tray-$rid "src/Remina.Agent.Tray/bin/Release/net8.0/$rid"  # libère l'espace
           done
 
       - uses: actions/upload-artifact@v4

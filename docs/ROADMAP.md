@@ -20,6 +20,13 @@ installateurs à une Release ; l'auto-mise à jour s'appuie dessus.
 - `ct/` — scripts Proxmox : `remina.sh` (création LXC), `remina-update.sh` (mise à jour serveur).
 - `.github/workflows/release.yml` — build 4 plateformes + installateurs Windows, Release sur tag.
 
+## Nouveautés v0.1.13
+- **Correctif CI installeur macOS** : `hdiutil create -srcfolder` (avec lien `/Applications`)
+  sur-estimait la taille de l'image → échec aléatoire `No space left on device` selon le
+  runner. `make-dmg.sh` crée désormais une image RW explicitement dimensionnée (taille de
+  l'app + 80 Mo) puis la convertit en UDZO ; la CI libère l'espace entre les deux architectures.
+  (La v0.1.12 n'a pas produit de Release : le job macOS échouait, donc le job `release` était sauté.)
+
 ## Nouveautés v0.1.12
 - **Correctif routage des commandes** : les postes clonés (même `MachineGuid` Windows)
   recevaient le même identifiant matériel → commandes/installeur routés vers le mauvais poste.

@@ -41,8 +41,16 @@ fi
 codesign --force --deep -s - "$APP" 2>/dev/null || true
 
 OUT="Remina-Agent-GUI-${VERSION}-${ARCH}.dmg"
-STAGE="$WORK/dmg"; mkdir -p "$STAGE"
-cp -a "$APP" "$STAGE/"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "Remina Agent" -srcfolder "$STAGE" -ov -format UDZO "$OUT"
+# Image RW explicitement dimensionnée (taille de l'app + marge) : évite la sur-estimation
+# de `hdiutil create -srcfolder` (qui suit le lien /Applications) et les « No space left ».
+RW="$WORK/rw-${ARCH}.dmg"
+SIZE_MB=$(( $(du -sm "$APP" | cut -f1) + 80 ))
+hdiutil create -volname "Remina Agent" -size "${SIZE_MB}m" -fs HFS+ -layout SPUD -ov "$RW"
+MNT="$(hdiutil attach "$RW" -nobrowse -noautoopen -mountrandom "$WORK" | awk -F'\t' '/\/Volumes\/|'"$WORK"'/{print $NF}' | tail -1)"
+cp -a "$APP" "$MNT/"
+ln -s /Applications "$MNT/Applications" 2>/dev/null || true
+sync
+hdiutil detach "$MNT" -force
+hdiutil convert "$RW" -format UDZO -ov -o "$OUT"
+rm -f "$RW"
 echo "DMG: $OUT"
