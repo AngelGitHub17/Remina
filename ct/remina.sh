@@ -115,6 +115,9 @@ Group=remina
 WantedBy=multi-user.target
 UNIT"
 run "systemctl daemon-reload && systemctl enable --now remina-server >/dev/null 2>&1"
+# Autorise l'utilisateur 'remina' à redémarrer son service (nécessaire à l'auto-mise à jour).
+run "apt-get install -y -qq sudo >/dev/null 2>&1 || true"
+run "printf 'remina ALL=(root) NOPASSWD: /usr/bin/systemctl restart remina-server, /bin/systemctl restart remina-server\n' > /etc/sudoers.d/remina && chmod 440 /etc/sudoers.d/remina"
 
 IP=$(run "hostname -I | awk '{print \$1}'" | tr -d '\r')
 

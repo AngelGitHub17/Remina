@@ -12,9 +12,7 @@ public static class UpdateEndpoints
         app.MapGet("/api/update", async (
             string app, string rid, string current, UpdateProvider provider, CancellationToken ct) =>
         {
-            var which = app.Equals("server", StringComparison.OrdinalIgnoreCase)
-                ? UpdateApp.Server : UpdateApp.Agent;
-            var result = await provider.CheckAsync(which, rid, current, ct);
+            var result = await provider.CheckAsync(app.ToLowerInvariant(), rid, current, ct);
             return Results.Ok(result);
         });
     }

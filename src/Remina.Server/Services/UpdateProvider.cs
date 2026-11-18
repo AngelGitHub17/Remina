@@ -29,7 +29,7 @@ public class UpdateProvider
     private bool Enabled => _cfg.GetValue("Remina:Update:Enabled", true);
     private TimeSpan CacheTtl => TimeSpan.FromMinutes(_cfg.GetValue("Remina:Update:CacheMinutes", 30));
 
-    public async Task<UpdateCheckResult> CheckAsync(UpdateApp app, string rid, string currentVersion, CancellationToken ct)
+    public async Task<UpdateCheckResult> CheckAsync(string appKey, string rid, string currentVersion, CancellationToken ct)
     {
         if (!Enabled) return new UpdateCheckResult { UpdateAvailable = false, LatestVersion = currentVersion };
 
@@ -37,8 +37,14 @@ public class UpdateProvider
         if (string.IsNullOrEmpty(_latestTag))
             return new UpdateCheckResult { UpdateAvailable = false, LatestVersion = currentVersion };
 
-        var appName = app == UpdateApp.Server ? "Server" : "Agent";
-        var assetName = $"Remina-{appName}-{rid}.zip";
+        // appKey : "server", "agent" (service) ou "agent-gui" (interface).
+        var middle = appKey switch
+        {
+            "server" => "Server",
+            "agent-gui" => "Agent-GUI",
+            _ => "Agent",
+        };
+        var assetName = $"Remina-{middle}-{rid}.zip";
         _assets.TryGetValue(assetName, out var url);
 
         return new UpdateCheckResult

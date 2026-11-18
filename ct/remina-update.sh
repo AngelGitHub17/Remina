@@ -47,6 +47,9 @@ id -u remina >/dev/null 2>&1 && chown -R remina:remina /opt/remina/server || tru
 rm -f /tmp/remina-server.zip
 systemctl start remina-server
 '
+# Autorise 'remina' à redémarrer son service (pour l'auto-mise à jour suivante).
+pct exec "$CTID" -- bash -c "command -v sudo >/dev/null 2>&1 || { apt-get update -qq; apt-get install -y -qq sudo; }; printf 'remina ALL=(root) NOPASSWD: /usr/bin/systemctl restart remina-server, /bin/systemctl restart remina-server\n' > /etc/sudoers.d/remina && chmod 440 /etc/sudoers.d/remina" >/dev/null 2>&1 || true
+
 msg "Serveur mis à jour."
 pct exec "$CTID" -- bash -c 'sleep 2; curl -fsS http://127.0.0.1:5080/api/version || true'
 echo

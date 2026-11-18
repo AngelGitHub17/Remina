@@ -196,20 +196,34 @@ public class AgentWorker : BackgroundService
     {
         try
         {
-            var res = await _client.CheckUpdateAsync(Updater.CurrentRid, ReminaVersion.Semver, ct);
+            var (app, binary, service, relaunchExe) = Variant();
+            var res = await _client.CheckUpdateAsync(app, Updater.CurrentRid, ReminaVersion.Semver, ct);
             if (res is null || !res.UpdateAvailable || res.DownloadUrl is null) return;
 
-            _log.LogInformation("Mise à jour agent {Ver} disponible.", res.LatestVersion);
+            _log.LogInformation("Mise à jour {App} {Ver} disponible.", app, res.LatestVersion);
             using var http = ServerClient.DownloadClient();
             await Updater.DownloadAndStageAsync(http, res.DownloadUrl,
                 AppContext.BaseDirectory, m => _log.LogInformation("{M}", m), ct);
-            Updater.LaunchHelperAndExit(AppContext.BaseDirectory, "Remina.Agent",
-                ServiceName(), m => _log.LogInformation("{M}", m));
+            Updater.LaunchHelperAndExit(AppContext.BaseDirectory, binary, service, relaunchExe,
+                m => _log.LogInformation("{M}", m));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _log.LogWarning(ex, "Auto-update agent : échec de la vérification.");
+            _log.LogWarning(ex, "Auto-update : échec de la vérification.");
         }
+    }
+
+    /// <summary>
+    /// Identité de la variante pour la mise à jour : clé d'app, binaire, service, mode de relance.
+    /// L'agent graphique (Remina.Agent.Tray) se relance par l'exécutable ; l'agent service
+    /// redémarre son service.
+    /// </summary>
+    private (string app, string binary, string? service, bool relaunchExe) Variant()
+    {
+        var exe = Path.GetFileNameWithoutExtension(Environment.ProcessPath ?? "") ?? "";
+        if (exe.Equals("Remina.Agent.Tray", StringComparison.OrdinalIgnoreCase))
+            return ("agent-gui", "Remina.Agent.Tray", null, true);
+        return ("agent", "Remina.Agent", ServiceName(), false);
     }
 
     private string? ServiceName() =>

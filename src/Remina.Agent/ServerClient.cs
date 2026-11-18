@@ -40,10 +40,10 @@ public class ServerClient
         return (HeartbeatResult.Ok, await resp.Content.ReadFromJsonAsync<HeartbeatResponse>(ct));
     }
 
-    /// <summary>Demande au serveur si une version d'agent plus récente est disponible.</summary>
-    public async Task<UpdateCheckResult?> CheckUpdateAsync(string rid, string current, CancellationToken ct)
+    /// <summary>Demande au serveur si une version plus récente est disponible pour cette variante.</summary>
+    public async Task<UpdateCheckResult?> CheckUpdateAsync(string app, string rid, string current, CancellationToken ct)
     {
-        var url = $"/api/update?app=agent&rid={Uri.EscapeDataString(rid)}&current={Uri.EscapeDataString(current)}";
+        var url = $"/api/update?app={Uri.EscapeDataString(app)}&rid={Uri.EscapeDataString(rid)}&current={Uri.EscapeDataString(current)}";
         var resp = await _http.GetAsync(url, ct);
         if (!resp.IsSuccessStatusCode) return null;
         return await resp.Content.ReadFromJsonAsync<UpdateCheckResult>(ct);

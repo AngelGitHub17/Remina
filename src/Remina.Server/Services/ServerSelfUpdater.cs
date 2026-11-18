@@ -34,7 +34,7 @@ public class ServerSelfUpdater : BackgroundService
         {
             try
             {
-                var res = await _provider.CheckAsync(UpdateApp.Server, Updater.CurrentRid,
+                var res = await _provider.CheckAsync("server", Updater.CurrentRid,
                     ReminaVersion.Semver, ct);
                 if (res.UpdateAvailable && res.DownloadUrl is not null)
                 {
@@ -44,7 +44,7 @@ public class ServerSelfUpdater : BackgroundService
                     await Updater.DownloadAndStageAsync(http, res.DownloadUrl,
                         AppContext.BaseDirectory, m => _log.LogInformation("{M}", m), ct);
                     Updater.LaunchHelperAndExit(AppContext.BaseDirectory, "Remina.Server",
-                        ServiceName(), m => _log.LogInformation("{M}", m));
+                        ServiceName(), relaunchExe: false, m => _log.LogInformation("{M}", m));
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

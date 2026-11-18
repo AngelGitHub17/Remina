@@ -59,6 +59,12 @@ EOF
 fi
 
 install -m 644 "$SRC/remina-$ROLE.service" "/etc/systemd/system/remina-$ROLE.service"
+# Le serveur tourne sous 'remina' : l'autoriser à redémarrer son service (auto-mise à jour).
+if [[ "$ROLE" == "server" ]]; then
+  command -v sudo >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq sudo; } || true
+  printf 'remina ALL=(root) NOPASSWD: /usr/bin/systemctl restart remina-server, /bin/systemctl restart remina-server\n' > /etc/sudoers.d/remina
+  chmod 440 /etc/sudoers.d/remina
+fi
 systemctl daemon-reload
 systemctl enable --now "remina-$ROLE"
 echo ">> Terminé. État :"
