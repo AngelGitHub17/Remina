@@ -15,7 +15,14 @@ var conn = builder.Configuration.GetConnectionString("Remina")
 builder.Services.AddDbContext<ReminaDbContext>(o => o.UseSqlite(conn));
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 1024 * 1024);
+
+// Autorise le téléversement de gros installeurs.
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 4L * 1024 * 1024 * 1024);
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = 4L * 1024 * 1024 * 1024;
+});
 
 // Auto-mise à jour : fournisseur d'info (Releases GitHub) + vérificateur en tâche de fond.
 builder.Services.AddHttpClient();
@@ -49,6 +56,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapAgentEndpoints();
 app.MapAdminEndpoints();
 app.MapUpdateEndpoints();
+app.MapPackageEndpoints();
 app.MapHub<Remina.Server.Hubs.AgentHub>("/hubs/agent");
 
 app.Run();

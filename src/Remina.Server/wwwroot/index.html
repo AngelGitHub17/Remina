@@ -89,6 +89,7 @@
       <a data-v="machines" onclick="nav('machines')"><span class="i">▣</span> Postes</a>
       <a data-v="bureaus" onclick="nav('bureaus')"><span class="i">◱</span> Bureaux</a>
       <a data-v="activity" onclick="nav('activity')"><span class="i">◴</span> Activité</a>
+      <a data-v="software" onclick="nav('software')"><span class="i">⇩</span> Logiciels</a>
       <a data-v="recap" onclick="nav('recap')"><span class="i">🧾</span> Récap</a>
       <a data-v="codes" onclick="nav('codes')"><span class="i">⚷</span> Codes</a>
     </nav>
@@ -144,6 +145,25 @@
       </div>
     </section>
 
+    <!-- SOFTWARE -->
+    <section id="v-software" class="hide">
+      <div class="card"><h2>Téléverser un installeur</h2>
+        <div class="row">
+          <input id="pkFile" type="file" style="flex:1">
+          <input id="pkName" placeholder="Nom (optionnel)">
+          <select id="pkOs"><option value="1">Windows</option><option value="2">macOS</option><option value="3">Linux</option></select>
+          <input id="pkArgs" placeholder="Args silencieux (ex : /S, /qn)">
+          <button onclick="uploadPackage()">Envoyer</button>
+        </div>
+        <div id="pkProgress" class="muted" style="margin-top:8px"></div>
+        <p class="muted" style="font-size:12px;margin-top:8px">Windows : .msi (/qn auto) ou .exe + args silencieux de l'installeur. Linux : .deb, .sh, .run. macOS : .pkg. L'installation requiert l'agent service / root sur le poste.</p>
+      </div>
+      <div class="card"><h2>Logiciels déployables</h2>
+        <table><thead><tr><th>Nom</th><th>Fichier</th><th>OS</th><th>Taille</th><th>Déployer vers</th><th></th></tr></thead>
+        <tbody id="pkBody"><tr><td colspan="6" class="muted">Chargement…</td></tr></tbody></table>
+      </div>
+    </section>
+
     <!-- RECAP -->
     <section id="v-recap" class="hide">
       <div class="card"><h2>Ajouter du temps</h2>
@@ -177,7 +197,7 @@
 <script>
 const State={key:"",machines:[],bureaus:[]};
 const CMD={Lock:1,Reboot:2,ShowMessage:3,PrintSummaryTicket:4,AutoLogin:5};
-const CMDNAME={0:"—",1:"Verrouiller",2:"Redémarrer",3:"Message",4:"Ticket",5:"Auto-login"};
+const CMDNAME={0:"—",1:"Verrouiller",2:"Redémarrer",3:"Message",4:"Ticket",5:"Auto-login",6:"Installation"};
 const OS={0:"Inconnu",1:"Windows",2:"macOS",3:"Linux"};
 const $=id=>document.getElementById(id);
 
@@ -199,16 +219,53 @@ async function login(){
 }
 function logout(){sessionStorage.removeItem("remina_key");State.key="";$("shell").classList.add("hide");$("gate").classList.remove("hide");}
 
-const TITLES={dash:"Tableau de bord",machines:"Postes",bureaus:"Bureaux",activity:"Activité",recap:"Récap",codes:"Codes d'inscription"};
+const TITLES={dash:"Tableau de bord",machines:"Postes",bureaus:"Bureaux",activity:"Activité",software:"Logiciels",recap:"Récap",codes:"Codes d'inscription"};
 function nav(v){
   document.querySelectorAll("#side nav a").forEach(a=>a.classList.toggle("active",a.dataset.v===v));
-  ["dash","machines","bureaus","activity","recap","codes"].forEach(n=>$("v-"+n).classList.toggle("hide",n!==v));
+  ["dash","machines","bureaus","activity","software","recap","codes"].forEach(n=>$("v-"+n).classList.toggle("hide",n!==v));
   $("title").textContent=TITLES[v];
   if(v==="dash")loadDash();
   if(v==="activity")fillActivityMachines();
+  if(v==="software")loadPackages();
   if(v==="recap")initRecap();
   if(v==="codes")loadCodes();
 }
+
+/* SOFTWARE */
+function fmtSize(b){if(b>1073741824)return(b/1073741824).toFixed(1)+" Go";if(b>1048576)return(b/1048576).toFixed(1)+" Mo";return Math.round(b/1024)+" Ko";}
+async function uploadPackage(){
+  const f=$("pkFile").files[0];if(!f)return toast("Choisis un fichier.",true);
+  const fd=new FormData();fd.append("file",f);fd.append("name",$("pkName").value.trim());fd.append("os",$("pkOs").value);fd.append("silentArgs",$("pkArgs").value.trim());
+  $("pkProgress").textContent="Envoi en cours…";
+  try{
+    const xhr=new XMLHttpRequest();
+    await new Promise((res,rej)=>{
+      xhr.open("POST","/api/admin/packages");xhr.setRequestHeader("X-Admin-Key",State.key);
+      xhr.upload.onprogress=e=>{if(e.lengthComputable)$("pkProgress").textContent="Envoi : "+Math.round(e.loaded*100/e.total)+"%";};
+      xhr.onload=()=>xhr.status<300?res():rej(new Error("HTTP "+xhr.status));
+      xhr.onerror=()=>rej(new Error("Échec réseau"));xhr.send(fd);
+    });
+    $("pkProgress").textContent="";$("pkName").value=$("pkArgs").value="";$("pkFile").value="";
+    toast("Installeur envoyé.");loadPackages();
+  }catch(e){$("pkProgress").textContent="";toast(e.message,true);}
+}
+async function loadPackages(){
+  const body=$("pkBody");
+  try{
+    const pkgs=await api("/api/admin/packages");
+    const mopts=State.machines.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
+    body.innerHTML=pkgs.length?pkgs.map(p=>`<tr>
+      <td>${esc(p.name)}</td><td class="muted">${esc(p.fileName)}</td><td>${OS[p.os]||'?'}</td><td class="muted">${fmtSize(p.sizeBytes)}</td>
+      <td><select id="dep-${p.id}"><option value="">— Poste —</option>${mopts}</select></td>
+      <td class="row"><button class="sec" onclick="deployPackage('${p.id}')">Déployer</button><button class="danger" onclick="delPackage('${p.id}','${esc(p.name)}')">✕</button></td>
+    </tr>`).join(""):'<tr><td colspan="6" class="muted">Aucun logiciel. Téléverse un installeur ci-dessus.</td></tr>';
+  }catch(e){toast(e.message,true);}
+}
+async function deployPackage(pid){
+  const mid=$("dep-"+pid).value;if(!mid)return toast("Choisis un poste.",true);
+  try{await api(`/api/admin/machines/${mid}/deploy`,{method:"POST",body:JSON.stringify({packageId:pid})});toast("Déploiement envoyé au poste.");}catch(e){toast(e.message,true);}
+}
+async function delPackage(id,name){if(!confirm(`Supprimer le logiciel « ${name} » ?`))return;try{await api("/api/admin/packages/"+id,{method:"DELETE"});toast("Supprimé.");loadPackages();}catch(e){toast(e.message,true);}}
 
 async function refresh(){
   try{const[m,b]=await Promise.all([api("/api/admin/machines"),api("/api/admin/bureaus")]);

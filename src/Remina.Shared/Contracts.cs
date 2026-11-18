@@ -79,6 +79,15 @@ public enum AgentCommandType
     ShowMessage = 3,
     PrintSummaryTicket = 4,
     AutoLogin = 5,
+    InstallPackage = 6,
+}
+
+/// <summary>Charge utile d'une commande d'installation de logiciel.</summary>
+public record InstallPayload
+{
+    public Guid PackageId { get; init; }
+    public string FileName { get; init; } = "";
+    public string? SilentArgs { get; init; }
 }
 
 public record AgentCommand

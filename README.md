@@ -102,6 +102,15 @@ Linux/macOS : CUPS). L'agent service imprime directement.
 | `Remina:Recap:Hour` / `Minute` | `20` / `0` | Heure d'envoi |
 | `Remina:Recap:MachineName` | (vide) | Poste qui imprime (vide = le plus récemment vu) |
 
+## Déploiement de logiciels
+
+Section **Logiciels** de la console : téléverse un installeur (Windows `.msi`/`.exe`,
+Linux `.deb`/`.sh`/`.run`, macOS `.pkg`), précise ses **arguments silencieux**, puis
+**Déploie** vers un poste. L'agent télécharge l'installeur (authentifié par son jeton) et
+l'exécute en silencieux. Les installations système requièrent l'**agent service / root**
+sur le poste. API : `POST/GET/DELETE /api/admin/packages`,
+`POST /api/admin/machines/{id}/deploy`.
+
 ## Console web
 
 Le serveur sert une console d'administration à sa racine (`http://SERVER:5080/`) :

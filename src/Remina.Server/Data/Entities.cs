@@ -103,6 +103,18 @@ public class ManualTimeEntry
     public int Minutes => (int)Math.Max(0, (End - Start).TotalMinutes);
 }
 
+/// <summary>Installeur de logiciel téléversé, déployable sur les postes.</summary>
+public class Package
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = "";
+    public string FileName { get; set; } = "";
+    public OsPlatform Os { get; set; }
+    public string? SilentArgs { get; set; }
+    public long SizeBytes { get; set; }
+    public DateTimeOffset UploadedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
 /// <summary>Commande en attente de récupération par un agent.</summary>
 public class AgentCommandRecord
 {

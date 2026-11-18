@@ -12,9 +12,9 @@ public class ServerClient
 {
     private readonly HttpClient _http;
 
-    public ServerClient(string baseUrl)
+    public ServerClient(string baseUrl, TimeSpan? timeout = null)
     {
-        _http = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(15) };
+        _http = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = timeout ?? TimeSpan.FromSeconds(15) };
     }
 
     public async Task<EnrollResponse?> EnrollAsync(EnrollRequest req, CancellationToken ct)
@@ -59,6 +59,20 @@ public class ServerClient
         msg.Headers.Add("X-Agent-Token", token);
         var resp = await _http.SendAsync(msg, ct);
         return resp.IsSuccessStatusCode;
+    }
+
+    /// <summary>Télécharge un installeur depuis le serveur vers <paramref name="destPath"/>.</summary>
+    public async Task<bool> DownloadPackageAsync(string token, Guid machineId, Guid packageId, string destPath, CancellationToken ct)
+    {
+        using var msg = new HttpRequestMessage(HttpMethod.Get,
+            $"/api/agent/package/{packageId}?machineId={machineId}");
+        msg.Headers.Add("X-Agent-Token", token);
+        using var resp = await _http.SendAsync(msg, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!resp.IsSuccessStatusCode) return false;
+        await using var src = await resp.Content.ReadAsStreamAsync(ct);
+        await using var dst = File.Create(destPath);
+        await src.CopyToAsync(dst, ct);
+        return true;
     }
 
     /// <summary>HttpClient dédié aux téléchargements (timeout long).</summary>

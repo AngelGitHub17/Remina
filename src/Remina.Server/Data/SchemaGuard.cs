@@ -39,6 +39,15 @@ public static class SchemaGuard
                 ""Note"" TEXT NULL,
                 ""Source"" TEXT NOT NULL,
                 ""CreatedAt"" TEXT NOT NULL);",
+
+            @"CREATE TABLE IF NOT EXISTS ""Packages"" (
+                ""Id"" TEXT NOT NULL CONSTRAINT ""PK_Packages"" PRIMARY KEY,
+                ""Name"" TEXT NOT NULL,
+                ""FileName"" TEXT NOT NULL,
+                ""Os"" INTEGER NOT NULL,
+                ""SilentArgs"" TEXT NULL,
+                ""SizeBytes"" INTEGER NOT NULL,
+                ""UploadedAt"" TEXT NOT NULL);",
         };
 
         foreach (var s in sql)

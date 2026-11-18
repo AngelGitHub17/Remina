@@ -412,7 +412,7 @@ public static class AdminEndpoints
         });
     }
 
-    private static bool IsAdmin(HttpContext http, IConfiguration cfg)
+    internal static bool IsAdmin(HttpContext http, IConfiguration cfg)
     {
         var expected = cfg["Admin:ApiKey"];
         if (string.IsNullOrEmpty(expected)) return false; // pas de clé = admin fermé

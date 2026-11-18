@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.SignalR.Client;
 using Remina.Agent.Platform;
 using Remina.Shared;
@@ -336,6 +337,39 @@ public class AgentWorker : BackgroundService
                     ? "Connexion automatique configurée."
                     : "Échec de la configuration auto-login (droits administrateur requis ?).");
                 break;
+            case AgentCommandType.InstallPackage:
+                _ = Task.Run(() => InstallPackageAsync(cmd.Payload));
+                break;
+        }
+    }
+
+    /// <summary>Télécharge et installe un paquet en silencieux.</summary>
+    private async Task InstallPackageAsync(string? payloadJson)
+    {
+        try
+        {
+            var p = JsonSerializer.Deserialize<InstallPayload>(payloadJson ?? "");
+            if (p is null || p.PackageId == Guid.Empty) return;
+
+            var dir = Path.Combine(Path.GetTempPath(), "remina-pkg-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            var file = Path.Combine(dir, p.FileName);
+
+            _log.LogInformation("Déploiement : téléchargement de {Name}…", p.FileName);
+            var client = new ServerClient(_serverUrl, TimeSpan.FromMinutes(30));
+            var ok = await client.DownloadPackageAsync(_state.AgentToken, _state.MachineId, p.PackageId, file, CancellationToken.None);
+            if (!ok) { _log.LogWarning("Déploiement : téléchargement échoué."); return; }
+
+            _log.LogInformation("Déploiement : installation de {Name}…", p.FileName);
+            var (success, code) = Installer.Install(file, p.SilentArgs);
+            if (success) _log.LogInformation("Déploiement réussi : {Name}.", p.FileName);
+            else _log.LogWarning("Déploiement échoué ({Name}), code {Code} (droits admin/root requis ?).", p.FileName, code);
+
+            try { Directory.Delete(dir, recursive: true); } catch { }
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Déploiement : erreur.");
         }
     }
 }
