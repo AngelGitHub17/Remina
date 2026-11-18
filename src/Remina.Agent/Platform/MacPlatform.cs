@@ -7,7 +7,7 @@ public sealed class MacPlatform : PlatformBase
 {
     public override OsPlatform Os => OsPlatform.MacOs;
 
-    public override string GetHardwareId()
+    protected override string GetOsHardwareBase()
     {
         // IOPlatformUUID : identifiant matériel stable propre au Mac.
         var uuid = RunShell("ioreg", "-rd1 -c IOPlatformExpertDevice");

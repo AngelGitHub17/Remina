@@ -32,7 +32,20 @@ public abstract class PlatformBase : IPlatform
     // Inactivité : surchargée par OS (API système). Faux par défaut (sans faux positifs).
     public virtual bool IsUserIdle(TimeSpan threshold) => false;
 
-    public abstract string GetHardwareId();
+    /// <summary>
+    /// Identifiant matériel unique et stable : combine l'identifiant OS (MachineGuid,
+    /// /etc/machine-id, IOPlatformUUID) avec l'adresse MAC et le nom d'hôte, puis hache.
+    /// Deux machines clonées (même MachineGuid) obtiennent ainsi des identifiants distincts.
+    /// </summary>
+    public string GetHardwareId()
+    {
+        var raw = $"{GetOsHardwareBase()}|{GetPrimaryMac() ?? ""}|{Environment.MachineName}";
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw));
+        return Convert.ToHexString(hash);
+    }
+
+    /// <summary>Identifiant propre à l'OS (surchargé par plateforme).</summary>
+    protected abstract string GetOsHardwareBase();
 
     // --- Actions de commande (implémentations par OS, best-effort) ---
 

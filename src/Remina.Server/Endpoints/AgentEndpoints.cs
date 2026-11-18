@@ -177,7 +177,30 @@ public static class AgentEndpoints
             await db.SaveChangesAsync();
             return Results.Ok();
         });
+
+        // Entrée de temps envoyée par l'agent (bouton « étape de récap »). Jeton d'agent requis.
+        g.MapPost("/time-entry", async (AgentTimeEntryDto dto, HttpContext http, ReminaDbContext db) =>
+        {
+            var token = http.Request.Headers["X-Agent-Token"].ToString();
+            var machine = await db.Machines.FirstOrDefaultAsync(m => m.Id == dto.MachineId);
+            if (machine is null || string.IsNullOrEmpty(token) || !TokenService.Verify(token, machine.AgentTokenHash))
+                return Results.Unauthorized();
+            if (string.IsNullOrWhiteSpace(dto.Project) || dto.End <= dto.Start)
+                return Results.BadRequest();
+
+            db.TimeEntries.Add(new ManualTimeEntry
+            {
+                Project = dto.Project.Trim(),
+                Start = dto.Start, End = dto.End,
+                Note = string.IsNullOrWhiteSpace(dto.Note) ? null : dto.Note!.Trim(),
+                Source = $"agent · {machine.Name}",
+            });
+            await db.SaveChangesAsync();
+            return Results.Ok();
+        });
     }
+
+    public record AgentTimeEntryDto(Guid MachineId, string Project, DateTimeOffset Start, DateTimeOffset End, string? Note);
 
     private static void ApplyInventory(Machine m, MachineInventory inv)
     {

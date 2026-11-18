@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Remina Agent
+Comment=Agent graphique Remina (gestion de parc)
+Exec=Remina.Agent.Tray
+Icon=remina-agent
+Categories=Utility;System;
+Terminal=false

@@ -42,9 +42,22 @@ public class AgentWorker : BackgroundService
 
         if (_state.IsEnrolled)
         {
-            _status.Enrolled = true;
-            _status.MachineName = _state.MachineName;
-            _status.NotifyChanged();
+            // Détecte une identité copiée depuis une autre machine (install clonée / fichier
+            // d'état recopié) : si le matériel ne correspond plus, on repart sur une inscription
+            // propre pour obtenir un poste distinct (évite deux postes qui partagent un MachineId).
+            var currentHw = _platform.GetHardwareId();
+            if (!string.IsNullOrEmpty(_state.HardwareId) && !string.IsNullOrEmpty(currentHw)
+                && !string.Equals(_state.HardwareId, currentHw, StringComparison.OrdinalIgnoreCase))
+            {
+                _log.LogWarning("Identité provenant d'une autre machine (matériel différent) — nouvelle inscription.");
+                _state = new AgentState { ServerUrl = _serverUrl };
+            }
+            else
+            {
+                _status.Enrolled = true;
+                _status.MachineName = _state.MachineName;
+                _status.NotifyChanged();
+            }
         }
 
         // Imprimantes : liste + choix mémorisé, et persistance du choix fait depuis l'UI.
@@ -56,6 +69,10 @@ public class AgentWorker : BackgroundService
             _state.PrinterName = p;
             try { _state.Save(); } catch { }
         };
+        _status.SubmitTimeEntry = (project, start, end) =>
+            _client.PostTimeEntryAsync(_state.AgentToken, new AgentTimeEntryReport
+            { MachineId = _state.MachineId, Project = project, Start = start, End = end },
+            CancellationToken.None);
 
         // Inscription : on réessaie jusqu'à réussir (serveur momentanément injoignable, etc.).
         while (!_state.IsEnrolled && !ct.IsCancellationRequested)

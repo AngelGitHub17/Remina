@@ -20,6 +20,20 @@ installateurs à une Release ; l'auto-mise à jour s'appuie dessus.
 - `ct/` — scripts Proxmox : `remina.sh` (création LXC), `remina-update.sh` (mise à jour serveur).
 - `.github/workflows/release.yml` — build 4 plateformes + installateurs Windows, Release sur tag.
 
+## Nouveautés v0.1.12
+- **Correctif routage des commandes** : les postes clonés (même `MachineGuid` Windows)
+  recevaient le même identifiant matériel → commandes/installeur routés vers le mauvais poste.
+  `GetHardwareId` combine désormais base OS + adresse MAC + nom de machine (hash SHA-256),
+  garantissant un identifiant unique par poste.
+- **Agent graphique : bouton « Étape du récap »** — saisir le libellé, démarrer/arrêter un
+  chrono ; à l'arrêt (≥ 30 s) le temps est envoyé au serveur (`POST /api/agent/time-entry`,
+  source « agent · <poste> »), comme la page mobile `/log.html`.
+- **Installateurs simples pour les autres OS** (agent, interface comprise) :
+  - Linux : **.deb** et **.rpm** (agent service, via nfpm) → `packaging/linux/nfpm/`.
+  - Linux : **AppImage** (agent graphique) → `packaging/linux/appimage/`.
+  - macOS : **.dmg** (agent graphique, `Remina Agent.app` signé ad-hoc) → `packaging/macos/make-dmg.sh`.
+  - CI : jobs `linux-installers` (ubuntu) et `macos-installer` (macOS) ; artefacts attachés à la Release.
+
 ## Fait (jusqu'à v0.1.11)
 - Inscription des postes façon GLPI (codes d'inscription), heartbeat, temps réel SignalR.
 - Bureaux (groupes de postes = locaux), rattachement à l'inscription ou après coup.

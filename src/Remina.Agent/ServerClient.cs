@@ -98,6 +98,16 @@ public class ServerClient
         catch { }
     }
 
+    /// <summary>Envoie une entrée de temps (étape de récap lancée depuis l'interface).</summary>
+    public async Task<bool> PostTimeEntryAsync(string token, AgentTimeEntryReport report, CancellationToken ct)
+    {
+        using var msg = new HttpRequestMessage(HttpMethod.Post, "/api/agent/time-entry")
+        { Content = JsonContent.Create(report) };
+        msg.Headers.Add("X-Agent-Token", token);
+        var resp = await _http.SendAsync(msg, ct);
+        return resp.IsSuccessStatusCode;
+    }
+
     /// <summary>HttpClient dédié aux téléchargements (timeout long).</summary>
     public static HttpClient DownloadClient() => new() { Timeout = TimeSpan.FromMinutes(5) };
 }

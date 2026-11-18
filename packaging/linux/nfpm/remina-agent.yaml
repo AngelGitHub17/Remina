@@ -1,0 +1,27 @@
+name: remina-agent
+arch: ${PKG_ARCH}
+platform: linux
+version: ${PKG_VERSION}
+version_schema: semver
+section: admin
+priority: optional
+maintainer: NounoursCorp <contact@nounourscorp.fr>
+description: |
+  Agent Remina - gestion de parc (facon GLPI).
+  Service systemd qui remonte l'inventaire et execute les commandes du serveur Remina.
+vendor: NounoursCorp
+homepage: https://github.com/AngelGitHub17/Remina
+license: MIT
+contents:
+  - src: ./dist/nfpm/Remina.Agent
+    dst: /opt/remina/agent/Remina.Agent
+    file_info:
+      mode: 0755
+  - src: ./packaging/linux/remina-agent.service
+    dst: /lib/systemd/system/remina-agent.service
+  - src: ./packaging/linux/agent.env.example
+    dst: /etc/remina/agent.env
+    type: "config|noreplace"
+scripts:
+  postinstall: ./packaging/linux/nfpm/postinstall.sh
+  preremove: ./packaging/linux/nfpm/preremove.sh

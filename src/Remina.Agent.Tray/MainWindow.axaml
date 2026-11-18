@@ -40,6 +40,17 @@
         </Grid>
       </Border>
 
+      <Border Background="#171a21" CornerRadius="8" Padding="12">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Étape du récap" Foreground="#e6e8ee" FontWeight="SemiBold"/>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBox x:Name="StepName" Watermark="Ce que tu fais (ex : Rémina)" Width="220"/>
+            <Button x:Name="StepButton" Content="Démarrer" Click="OnStepToggle"/>
+          </StackPanel>
+          <TextBlock x:Name="StepStatus" Classes="label" Text=""/>
+        </StackPanel>
+      </Border>
+
       <TextBlock x:Name="ErrorText" Foreground="#ef4444" FontSize="12" TextWrapping="Wrap"/>
 
       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">

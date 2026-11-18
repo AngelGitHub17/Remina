@@ -60,5 +60,34 @@ public partial class MainWindow : Window
         _status.NotifyChanged();
     }
 
+    private DateTimeOffset? _stepStart;
+    private async void OnStepToggle(object? sender, RoutedEventArgs e)
+    {
+        if (_stepStart is null)
+        {
+            var name = StepName.Text?.Trim() ?? "";
+            if (name.Length == 0) { StepStatus.Text = "Indique d'abord ce que tu fais."; return; }
+            _stepStart = DateTimeOffset.Now;
+            StepButton.Content = "Arrêter";
+            StepName.IsEnabled = false;
+            StepStatus.Text = "En cours depuis " + _stepStart.Value.ToString("HH:mm") + "…";
+        }
+        else
+        {
+            var start = _stepStart.Value;
+            var end = DateTimeOffset.Now;
+            _stepStart = null;
+            StepButton.Content = "Démarrer";
+            StepName.IsEnabled = true;
+            var mins = (int)(end - start).TotalMinutes;
+            if (_status?.SubmitTimeEntry is not null && (end - start).TotalSeconds >= 30)
+            {
+                var ok = await _status.SubmitTimeEntry(StepName.Text?.Trim() ?? "", start, end);
+                StepStatus.Text = ok ? $"Envoyé : {mins} min." : "Échec de l'envoi.";
+            }
+            else StepStatus.Text = "Trop court (ignoré).";
+        }
+    }
+
     private void OnHide(object? sender, RoutedEventArgs e) => Hide();
 }

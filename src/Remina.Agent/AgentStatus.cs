@@ -39,4 +39,7 @@ public class AgentStatus
     public event Action<string>? PrintTicketRequested;
     public bool HasPrintHandler => PrintTicketRequested != null;
     public void RequestPrint(string text) => PrintTicketRequested?.Invoke(text);
+
+    /// <summary>Envoie une étape de récap (projet, début, fin) au serveur. Fourni par l'agent.</summary>
+    public Func<string, DateTimeOffset, DateTimeOffset, Task<bool>>? SubmitTimeEntry;
 }

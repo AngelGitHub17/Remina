@@ -18,3 +18,13 @@ public record ActivityReport
     public Guid MachineId { get; init; }
     public IReadOnlyList<ActivityEntry> Entries { get; init; } = Array.Empty<ActivityEntry>();
 }
+
+/// <summary>Entrée de temps envoyée par l'agent (étape de récap lancée/arrêtée depuis l'interface).</summary>
+public record AgentTimeEntryReport
+{
+    public Guid MachineId { get; init; }
+    public string Project { get; init; } = "";
+    public DateTimeOffset Start { get; init; }
+    public DateTimeOffset End { get; init; }
+    public string? Note { get; init; }
+}

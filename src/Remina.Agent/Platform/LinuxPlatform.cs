@@ -6,7 +6,7 @@ public sealed class LinuxPlatform : PlatformBase
 {
     public override OsPlatform Os => OsPlatform.Linux;
 
-    public override string GetHardwareId()
+    protected override string GetOsHardwareBase()
     {
         // /etc/machine-id : identifiant stable fourni par systemd/dbus.
         foreach (var path in new[] { "/etc/machine-id", "/var/lib/dbus/machine-id" })

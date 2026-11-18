@@ -95,9 +95,101 @@ jobs:
           name: Remina-Windows-Installers
           path: dist/*.exe
 
+  # Installateurs Linux : .deb + .rpm (agent service, via nfpm) et AppImage (agent graphique).
+  linux-installers:
+    name: Installateurs Linux (.deb/.rpm/AppImage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Déterminer la version
+        id: ver
+        run: |
+          V=$(sed -n 's/.*Semver[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' src/Remina.Shared/ReminaVersion.cs | head -1)
+          echo "v=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Publier l'agent service (linux-x64)
+        run: >
+          dotnet publish src/Remina.Agent -c Release -r linux-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out/agent
+
+      - name: Publier l'agent graphique (linux-x64)
+        run: >
+          dotnet publish src/Remina.Agent.Tray -c Release -r linux-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out/tray
+
+      - name: Installer nfpm
+        run: |
+          curl -fsSL -o /tmp/nfpm.deb https://github.com/goreleaser/nfpm/releases/download/v2.43.0/nfpm_2.43.0_amd64.deb
+          sudo dpkg -i /tmp/nfpm.deb
+
+      - name: Construire .deb et .rpm (agent service)
+        run: |
+          mkdir -p dist/nfpm dist
+          cp out/agent/Remina.Agent dist/nfpm/Remina.Agent
+          PKG_VERSION=${{ steps.ver.outputs.v }} PKG_ARCH=amd64 \
+            nfpm package -f packaging/linux/nfpm/remina-agent.yaml -p deb \
+            -t dist/remina-agent_${{ steps.ver.outputs.v }}_amd64.deb
+          PKG_VERSION=${{ steps.ver.outputs.v }} PKG_ARCH=x86_64 \
+            nfpm package -f packaging/linux/nfpm/remina-agent.yaml -p rpm \
+            -t dist/remina-agent-${{ steps.ver.outputs.v }}.x86_64.rpm
+
+      - name: Construire l'AppImage (agent graphique)
+        run: |
+          curl -fsSL -o /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+          ( cd /tmp && ./appimagetool --appimage-extract >/dev/null )
+          export APPIMAGETOOL="/tmp/squashfs-root/AppRun"
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          packaging/linux/appimage/build-appimage.sh out/tray ${{ steps.ver.outputs.v }} x86_64
+          mv Remina-Agent-*.AppImage dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Remina-Linux-Installers
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
+
+  # Installateur macOS : .dmg de l'agent graphique (Apple Silicon + Intel).
+  macos-installer:
+    name: Installateur macOS (.dmg)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Déterminer la version
+        id: ver
+        run: |
+          V=$(sed -n 's/.*Semver[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' src/Remina.Shared/ReminaVersion.cs | head -1)
+          echo "v=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Publier et empaqueter (.dmg) pour osx-arm64 et osx-x64
+        run: |
+          mkdir -p dist
+          for rid in osx-arm64 osx-x64; do
+            arch="${rid#osx-}"
+            dotnet publish src/Remina.Agent.Tray -c Release -r $rid --self-contained true \
+              -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out/tray-$rid
+            packaging/macos/make-dmg.sh out/tray-$rid ${{ steps.ver.outputs.v }} "$arch"
+            mv Remina-Agent-GUI-*.dmg dist/
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Remina-macOS-Installers
+          path: dist/*.dmg
+
   release:
     name: Publier la Release
-    needs: [ build, windows-installer ]
+    needs: [ build, windows-installer, linux-installers, macos-installer ]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
@@ -112,4 +204,8 @@ jobs:
           files: |
             dist/*.zip
             dist/*.exe
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
+            dist/*.dmg
           generate_release_notes: true

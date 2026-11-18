@@ -9,7 +9,7 @@ public sealed class WindowsPlatform : PlatformBase
 {
     public override OsPlatform Os => OsPlatform.Windows;
 
-    public override string GetHardwareId()
+    protected override string GetOsHardwareBase()
     {
         // MachineGuid : stable, propre à l'installation Windows.
         var id = RunReg(@"HKLM\SOFTWARE\Microsoft\Cryptography", "MachineGuid");

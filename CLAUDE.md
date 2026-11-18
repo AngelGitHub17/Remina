@@ -9,7 +9,9 @@ route v0.2.0.
 - `src/Remina.Server` — API ASP.NET Core + EF Core (SQLite), SignalR, console web (`wwwroot/`).
 - `src/Remina.Agent` — agent service (Windows service / systemd / launchd).
 - `src/Remina.Agent.Tray` — agent graphique Avalonia (réutilise le cœur de Remina.Agent).
-- `packaging/` installateurs, `ct/` scripts Proxmox, `.github/workflows/release.yml` CI.
+- `packaging/` installateurs : Windows (Inno Setup), Linux (`linux/install.sh` + systemd ;
+  `linux/nfpm/` .deb/.rpm ; `linux/appimage/` AppImage GUI), macOS (`macos/install.sh` launchd ;
+  `macos/make-dmg.sh` .dmg GUI). `ct/` scripts Proxmox, `.github/workflows/release.yml` CI.
 
 ## Commandes
 ```bash
