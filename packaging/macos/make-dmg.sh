@@ -44,9 +44,11 @@ OUT="Remina-Agent-GUI-${VERSION}-${ARCH}.dmg"
 # Image RW explicitement dimensionnée (taille de l'app + marge) : évite la sur-estimation
 # de `hdiutil create -srcfolder` (qui suit le lien /Applications) et les « No space left ».
 RW="$WORK/rw-${ARCH}.dmg"
+MNT="$WORK/mnt-${ARCH}"
 SIZE_MB=$(( $(du -sm "$APP" | cut -f1) + 80 ))
 hdiutil create -volname "Remina Agent" -size "${SIZE_MB}m" -fs HFS+ -layout SPUD -ov "$RW"
-MNT="$(hdiutil attach "$RW" -nobrowse -noautoopen -mountrandom "$WORK" | awk -F'\t' '/\/Volumes\/|'"$WORK"'/{print $NF}' | tail -1)"
+mkdir -p "$MNT"
+hdiutil attach "$RW" -nobrowse -noautoopen -mountpoint "$MNT"
 cp -a "$APP" "$MNT/"
 ln -s /Applications "$MNT/Applications" 2>/dev/null || true
 sync

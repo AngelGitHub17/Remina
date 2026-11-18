@@ -20,6 +20,12 @@ installateurs à une Release ; l'auto-mise à jour s'appuie dessus.
 - `ct/` — scripts Proxmox : `remina.sh` (création LXC), `remina-update.sh` (mise à jour serveur).
 - `.github/workflows/release.yml` — build 4 plateformes + installateurs Windows, Release sur tag.
 
+## Nouveautés v0.1.14
+- **Correctif `make-dmg.sh`** : la récupération du point de montage via `awk` était cassée
+  (regex invalide après interpolation du chemin) → `illegal primary in regular expression`.
+  L'image est désormais montée sur un point de montage explicite (`hdiutil attach -mountpoint`),
+  sans aucun parsing.
+
 ## Nouveautés v0.1.13
 - **Correctif CI installeur macOS** : `hdiutil create -srcfolder` (avec lien `/Applications`)
   sur-estimait la taille de l'image → échec aléatoire `No space left on device` selon le
