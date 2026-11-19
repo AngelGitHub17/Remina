@@ -20,6 +20,21 @@ installateurs à une Release ; l'auto-mise à jour s'appuie dessus.
 - `ct/` — scripts Proxmox : `remina.sh` (création LXC), `remina-update.sh` (mise à jour serveur).
 - `.github/workflows/release.yml` — build 4 plateformes + installateurs Windows, Release sur tag.
 
+## Nouveautés v0.2.2 — Connexion NounoursAccount (axe A, itération 3)
+- Bouton **« Se connecter avec NounoursAccount »** : redirection vers
+  `didikaria.fr/connexion.php`, retour avec le `sso_token` existant (signé, 60 s, usage
+  unique), **échange serveur à serveur** auprès de `www/api/remina-sso.php` (dépôt
+  dkparkofwebOVH) authentifié par secret partagé. Remina n'accède jamais à la base MySQL.
+- Accès réservé aux **admins NounoursAccount** (`role_code ≥ 2`, réglable) ; compte Remina
+  créé automatiquement en **lecture seule** à la première connexion (promotion manuelle).
+- **Lier / délier** son compte local dans *Mon compte* (pas de liaison automatique par pseudo).
+- **Déconnexion couplée** : chaque session SSO porte un « lien » (hachage d'une entrée
+  `na_auth_tokens`, sans jeton brut) vérifié toutes les 2 min ; déconnexion, bannissement ou
+  perte du rôle admin côté NounoursAccount → session Remina coupée (tolérance 30 min si
+  NounoursAccount est injoignable). La déconnexion Remina révoque le lien.
+- État de connexion (`state`) lié au navigateur (cookie SameSite=Lax) ; tous les échecs
+  sont journalisés (`auth.nounours`). Colonnes `AdminSessions.ExternalLink` / `ExternalCheckedAt`.
+
 ## Nouveautés v0.2.1 — Journal d'audit & jetons d'API (axe A, itération 2)
 - **Journal d'audit** (table `AuditLog`, colonne entière `AtUnixMs` pour trier/paginer en SQL) :
   - automatique pour **toute écriture** sur `/api/admin/*` (y compris les refus 403 d'un compte
@@ -125,10 +140,8 @@ installateurs à une Release ; l'auto-mise à jour s'appuie dessus.
   être mis à jour **manuellement une fois** (réinstaller l'agent, lancer `ct/remina-update.sh`
   pour le serveur) ; ensuite l'auto-update s'enchaîne seul.
 
-## Axe A — suite prévue
-- **v0.2.2** : connexion **NounoursAccount** (redirection de login + vérification serveur à
-  serveur ; création automatique du compte à la 1re connexion ; déconnexion NounoursAccount →
-  session Remina coupée). Protocole à caler avec le code PHP de NounoursAccount.
+## Axe A — terminé (v0.2.0 → v0.2.2)
+Prochaine étape conseillée : **axe B (supervision & alertes)**.
 
 ## Idées pour la console (panel)
 - **Vue Postes** : filtres rapides (en ligne / hors ligne / RDP / bureau / OS / version

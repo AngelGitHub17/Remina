@@ -19,14 +19,18 @@ public static class AuthEndpoints
         var a = app.MapGroup("/api/auth");
 
         // État de la console : première configuration à faire ? qui suis-je ?
-        a.MapGet("/status", async (HttpContext http, AuthService auth) =>
+        a.MapGet("/status", async (HttpContext http, AuthService auth, NounoursService na, ReminaDbContext db) =>
         {
             var any = await auth.AnyUserAsync();
             var me = await auth.AuthenticateAsync(http);
+            var linked = me?.UserId is { } uid
+                && await db.AdminUsers.AnyAsync(x => x.Id == uid && x.ExternalProvider == NounoursService.Provider);
             return Results.Ok(new
             {
                 setupRequired = !any,
                 legacyKeyEnabled = await auth.LegacyKeyEnabledAsync(),
+                nounours = na.Enabled,
+                nounoursLinked = linked,
                 user = me is null ? null : MeDto(me),
             });
         });

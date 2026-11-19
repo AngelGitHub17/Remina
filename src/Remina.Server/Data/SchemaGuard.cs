@@ -129,6 +129,9 @@ public static class SchemaGuard
         TryExec(db, @"ALTER TABLE ""AgentCommands"" ADD COLUMN ""ExitCode"" INTEGER NULL;");
         TryExec(db, @"ALTER TABLE ""AgentCommands"" ADD COLUMN ""ResultMessage"" TEXT NULL;");
         TryExec(db, @"ALTER TABLE ""AgentCommands"" ADD COLUMN ""CompletedAt"" TEXT NULL;");
+        // v0.2.2 — sessions ouvertes via NounoursAccount.
+        TryExec(db, @"ALTER TABLE ""AdminSessions"" ADD COLUMN ""ExternalLink"" TEXT NULL;");
+        TryExec(db, @"ALTER TABLE ""AdminSessions"" ADD COLUMN ""ExternalCheckedAt"" TEXT NULL;");
     }
 
     private static void TryExec(ReminaDbContext db, string sql)

@@ -88,6 +88,7 @@
     <label for="liUser">Identifiant</label><input id="liUser" autocomplete="username" autocapitalize="none">
     <label for="liPass">Mot de passe</label><input id="liPass" type="password" autocomplete="current-password">
     <button type="submit">Se connecter</button>
+    <button type="button" id="naLogin" class="sec hide" onclick="location.href='/api/auth/nounours/start'">Se connecter avec NounoursAccount</button>
   </form>
   <form id="setupForm" class="hide" onsubmit="event.preventDefault();bootstrap()">
     <h2>Première configuration</h2>
@@ -275,16 +276,24 @@ function ago(iso){if(!iso)return"jamais";const s=Math.floor((Date.now()-new Date
 function bars(items,label,value,max){max=max||Math.max(1,...items.map(value));return items.length?items.map(it=>`<div class="bar"><span>${esc(label(it))}</span><div class="track"><div class="fill" style="width:${Math.round(value(it)*100/max)}%"></div></div><span class="val">${value(it)>=3600||value(it)<60?fmtDur(value(it)):value(it)}</span></div>`).join(""):'<span class="muted">Aucune donnée.</span>';}
 
 /* AUTH */
+const NA_ERRORS={disabled:"La connexion NounoursAccount n'est pas activée sur ce serveur.",state:"La connexion a expiré, recommence.",
+  token:"NounoursAccount a refusé la connexion.",unavailable:"NounoursAccount est injoignable pour le moment.",
+  denied:"Ce compte NounoursAccount n'a pas accès à Remina (réservé aux administrateurs).",account_disabled:"Compte Remina désactivé.",
+  conflict:"Ce compte NounoursAccount est déjà lié à un autre compte Remina.",session:"Reconnecte-toi à Remina avant de lier ton compte."};
 async function boot(){
+  const q=new URLSearchParams(location.search),naErr=q.get("na_error");
+  if(naErr){q.delete("na_error");history.replaceState(null,"",location.pathname+(q.toString()?"?"+q:""));}
   try{
-    const st=await api("/api/auth/status");
-    if(st.user)return enter(st.user,st.legacyKeyEnabled);
+    const st=await api("/api/auth/status");State.status=st;
+    if(st.user){enter(st.user,st.legacyKeyEnabled);if(naErr)toast(NA_ERRORS[naErr]||"Erreur NounoursAccount.",true);return;}
     showGate(st.setupRequired);
+    if(naErr)$("gateErr").textContent=NA_ERRORS[naErr]||"Erreur NounoursAccount.";
   }catch(e){showGate();$("gateErr").textContent=e.message;}
 }
 function showGate(setup=false){
   State.me=null;$("shell").classList.add("hide");$("gate").classList.remove("hide");closeModal();
   $("loginForm").classList.toggle("hide",setup);$("setupForm").classList.toggle("hide",!setup);
+  $("naLogin").classList.toggle("hide",!(State.status&&State.status.nounours));
   (setup?$("suKey"):$("liUser")).focus();
 }
 async function login(){
@@ -303,7 +312,7 @@ async function bootstrap(){
 async function afterLogin(){
   const next=new URLSearchParams(location.search).get("next");
   if(next&&/^\/[^\/\\]/.test(next)){location.href=next;return;}
-  const st=await api("/api/auth/status");if(st.user)enter(st.user,st.legacyKeyEnabled);else showGate();
+  const st=await api("/api/auth/status");State.status=st;if(st.user)enter(st.user,st.legacyKeyEnabled);else showGate();
 }
 async function enter(me,legacy){
   State.me=me;document.body.classList.toggle("ro",!me.isAdmin);
@@ -322,6 +331,10 @@ function openMyAccount(){
     ${State.me.method==="session"?`<h2 style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Changer de mot de passe</h2>
     <div class="row"><input id="pwCur" type="password" placeholder="Actuel" autocomplete="current-password"><input id="pwNew" type="password" placeholder="Nouveau (12 car. min.)" autocomplete="new-password"><input id="pwNew2" type="password" placeholder="Confirmation" autocomplete="new-password"><button onclick="changeMyPassword()">Changer</button></div>
     <p class="muted" style="font-size:12px">Tes autres sessions ouvertes seront fermées.</p>
+    ${State.status&&State.status.nounours?`<h2 style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">NounoursAccount</h2>
+    ${State.status.nounoursLinked
+      ?`<div class="row"><span style="flex:1"><span class="dot on"></span>Compte lié : tu peux te connecter avec NounoursAccount.</span><button class="sec" onclick="unlinkNounours()">Délier</button></div>`
+      :`<div class="row"><span style="flex:1" class="muted">Lie ton compte pour te connecter avec NounoursAccount.</span><button onclick="location.href='/api/auth/nounours/start?mode=link'">Lier mon compte NounoursAccount</button></div>`}`:""}
     <h2 style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Jetons d'API (scripts)</h2>
     <p class="muted" style="font-size:12px;margin:0 0 8px">En-tête <code>Authorization: Bearer rmn_…</code>, mêmes droits que ton compte. Remplace la clé historique dans tes scripts.</p>
     <div class="row"><input id="tkName" placeholder="Nom (ex : script sauvegarde)" style="flex:1"><select id="tkDays"><option value="90">90 jours</option><option value="365">1 an</option><option value="30">30 jours</option><option value="0">Sans expiration</option></select><button onclick="createToken()">Créer</button></div>
@@ -329,6 +342,9 @@ function openMyAccount(){
     <table style="margin-top:8px"><thead><tr><th>Nom</th><th>Début</th><th>Dernier usage</th><th>Expire</th><th></th></tr></thead><tbody id="tkBody"></tbody></table>`:""}`;
   $("modal").classList.remove("hide");
   if(State.me.method==="session")loadTokens();
+}
+async function unlinkNounours(){
+  try{await api("/api/auth/me/nounours/unlink",{method:"POST"});State.status.nounoursLinked=false;toast("Compte NounoursAccount délié.");openMyAccount();}catch(e){toast(e.message,true);}
 }
 async function loadTokens(){
   try{const list=await api("/api/auth/me/tokens");const d=x=>x?new Date(x).toLocaleDateString('fr-FR'):'—';
@@ -345,7 +361,9 @@ async function revokeToken(id){try{await api("/api/auth/me/tokens/"+id,{method:"
 
 /* AUDIT */
 const AUDIT_LABELS=[
-  [/^auth\.login$/,"Connexion"],[/^auth\.logout$/,"Déconnexion"],[/^auth\.bootstrap$/,"Première configuration"],
+  [/^auth\.login$/,"Connexion"],[/^auth\.nounours$/,"Connexion NounoursAccount refusée"],
+  [/^auth\.nounours\.create$/,"Compte créé via NounoursAccount"],[/^auth\.nounours\.link$/,"Compte NounoursAccount lié"],
+  [/^auth\.nounours\.unlink$/,"Compte NounoursAccount délié"],[/^auth\.logout$/,"Déconnexion"],[/^auth\.bootstrap$/,"Première configuration"],
   [/^auth\.password\.change$/,"Changement de mot de passe"],[/^auth\.reset-admin$/,"Réinitialisation (ligne de commande)"],
   [/^token\.create$/,"Jeton d'API créé"],[/^token\.revoke$/,"Jeton d'API révoqué"],[/^agent\.enroll$/,"Inscription d'un poste"],
   [/machines\/\{id\}\/commands$/,"Commande envoyée"],[/machines\/\{machineId\}\/deploy$/,"Déploiement sur un poste"],
@@ -402,7 +420,7 @@ async function loadAccounts(){
   try{
     const[users,st]=await Promise.all([api("/api/admin/users"),api("/api/admin/settings")]);
     body.innerHTML=users.map(u=>{const self=State.me&&u.id===State.me.userId;return `<tr>
-      <td><b>${esc(u.username)}</b>${self?' <span class="tag">toi</span>':''}</td><td>${esc(u.displayName)}</td>
+      <td><b>${esc(u.username)}</b>${self?' <span class="tag">toi</span>':''}${u.externalProvider==="nounours"?' <span class="tag" title="Connexion via NounoursAccount">NounoursAccount</span>':''}${u.hasPassword?'':' <span class="tag" title="Pas de mot de passe local">SSO seul</span>'}</td><td>${esc(u.displayName)}</td>
       <td><select ${self?'disabled':''} onchange="updateUser('${u.id}',{role:parseInt(this.value)})"><option value="0" ${u.role===0?'selected':''}>Lecture seule</option><option value="1" ${u.role===1?'selected':''}>Admin</option></select></td>
       <td>${u.isDisabled?'<span class="dot off"></span>désactivé':(u.locked?'<span class="tag rdp">verrouillé</span>':'<span class="dot on"></span>actif')}</td>
       <td class="muted">${u.lastLoginAt?ago(u.lastLoginAt):'jamais'}</td><td>${u.activeSessions}</td>

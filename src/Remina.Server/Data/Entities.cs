@@ -184,6 +184,10 @@ public class AdminSession
     public string? Ip { get; set; }
     public string? UserAgent { get; set; }
     public DateTimeOffset? RevokedAt { get; set; }
+    /// <summary>Session ouverte via NounoursAccount : hachage du lien côté NounoursAccount.</summary>
+    public string? ExternalLink { get; set; }
+    /// <summary>Dernière vérification réussie du lien auprès de NounoursAccount.</summary>
+    public DateTimeOffset? ExternalCheckedAt { get; set; }
 }
 
 /// <summary>Réglage serveur modifiable depuis la console (clé/valeur).</summary>

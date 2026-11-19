@@ -36,6 +36,8 @@ builder.Services.AddHostedService<Remina.Server.Services.RecapScheduler>();
 
 // Comptes de console : service d'authentification (sessions cookie + clé historique).
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddSingleton<NounoursService>();
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddHostedService<AuditPurger>();
 
@@ -123,6 +125,7 @@ app.UseMiddleware<AdminAuthMiddleware>();
 
 app.MapAgentEndpoints();
 app.MapAuthEndpoints();
+app.MapNounoursEndpoints();
 app.MapAdminEndpoints();
 app.MapUpdateEndpoints();
 app.MapPackageEndpoints();

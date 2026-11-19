@@ -140,6 +140,26 @@ toute seule toutes les 20 s.
   `sudo -u remina ./Remina.Server --reset-admin <identifiant>` (Proxmox : `cd /opt/remina/server`)
   → affiche un mot de passe temporaire.
 
+### Connexion NounoursAccount (depuis v0.2.2)
+
+Réservée aux administrateurs NounoursAccount ; un compte Remina en lecture seule est créé à
+la première connexion. Mise en service :
+
+1. **Côté NounoursAccount (OVH)** : déposer `www/api/remina-sso.php`, `www/connexion.php`,
+   `shared/passwordless.php` et le dossier `shared/secrets/` ; copier
+   `shared/secrets/remina.example.php` en `shared/secrets/remina.php` avec un secret aléatoire
+   (`php -r "echo bin2hex(random_bytes(32));"`).
+2. **Côté Remina** (`/etc/remina/server.env`) :
+   ```
+   Remina__Nounours__Enabled=true
+   Remina__Nounours__ClientSecret=<le même secret>
+   Remina__Nounours__PublicUrl=https://remina.didikaria.fr
+   # facultatif : BaseUrl (https://didikaria.fr), MinRoleCode (2), DefaultRole (ReadOnly),
+   #              CheckMinutes (2), GraceMinutes (30)
+   ```
+3. Redémarrer Remina : le bouton apparaît sur l'écran de connexion. Pour ton compte existant :
+   *Mon compte → Lier mon compte NounoursAccount*.
+
 ### Derrière Nginx (HTTPS)
 
 Remina ne croit les en-têtes `X-Forwarded-*` (IP réelle, HTTPS → cookie `Secure`) que

@@ -32,11 +32,13 @@ public sealed class AuthService
 
     private readonly ReminaDbContext _db;
     private readonly IConfiguration _cfg;
+    private readonly NounoursService _na;
 
-    public AuthService(ReminaDbContext db, IConfiguration cfg)
+    public AuthService(ReminaDbContext db, IConfiguration cfg, NounoursService na)
     {
         _db = db;
         _cfg = cfg;
+        _na = na;
     }
 
     private TimeSpan IdleTimeout => TimeSpan.FromHours(_cfg.GetValue("Remina:Auth:IdleHours", 12.0));
@@ -132,6 +134,9 @@ public sealed class AuthService
         var u = await _db.AdminUsers.FirstOrDefaultAsync(x => x.Id == s.UserId);
         if (u is null || u.IsDisabled) return null;
 
+        // Session NounoursAccount : déconnexion / bannissement / perte du rôle là-bas → coupée ici.
+        if (s.ExternalLink is not null && !await CheckExternalAsync(s, now)) return null;
+
         // Prolongation glissante, écrite au plus toutes les 5 minutes.
         if (now - s.LastSeenAt > TimeSpan.FromMinutes(5))
         {
@@ -139,6 +144,26 @@ public sealed class AuthService
             await _db.SaveChangesAsync();
         }
         return new AdminPrincipal(u.Id, u.Username, u.DisplayName, u.Role, "session", s.Id);
+    }
+
+    private async Task<bool> CheckExternalAsync(AdminSession s, DateTimeOffset now)
+    {
+        var last = s.ExternalCheckedAt ?? s.CreatedAt;
+        if (now - last < _na.CheckEvery) return true;
+
+        var res = await _na.CheckAsync(s.ExternalLink!);
+        if (res is null)
+            return now - last <= _na.Grace; // NounoursAccount injoignable : tolérance limitée
+
+        if (!res.Active || (res.RoleCode ?? 0) < _na.MinRoleCode)
+        {
+            s.RevokedAt = now;
+            await _db.SaveChangesAsync();
+            return false;
+        }
+        s.ExternalCheckedAt = now;
+        await _db.SaveChangesAsync();
+        return true;
     }
 
     private async Task<AdminPrincipal?> FromApiTokenAsync(string token)
@@ -176,7 +201,7 @@ public sealed class AuthService
 
     // --- Sessions -------------------------------------------------------------------------
 
-    public async Task CreateSessionAsync(AdminUser user, HttpContext http)
+    public async Task CreateSessionAsync(AdminUser user, HttpContext http, string? externalLink = null)
     {
         var token = TokenService.NewAgentToken(); // 32 octets aléatoires, base64url
         var now = DateTimeOffset.UtcNow;
@@ -190,6 +215,8 @@ public sealed class AuthService
             ExpiresAt = now + AbsoluteLifetime,
             Ip = http.Connection.RemoteIpAddress?.ToString(),
             UserAgent = ua.Length > 300 ? ua[..300] : ua,
+            ExternalLink = externalLink,
+            ExternalCheckedAt = externalLink is null ? null : now,
         });
         user.LastLoginAt = now;
         user.FailedLogins = 0;
@@ -210,6 +237,7 @@ public sealed class AuthService
             {
                 s.RevokedAt = DateTimeOffset.UtcNow;
                 await _db.SaveChangesAsync();
+                if (s.ExternalLink is not null) await _na.RevokeAsync(s.ExternalLink);
             }
         }
         http.Response.Cookies.Delete(CookieName, CookieOptions(http, null));
