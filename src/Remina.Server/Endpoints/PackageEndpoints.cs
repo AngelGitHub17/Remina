@@ -23,7 +23,6 @@ public static class PackageEndpoints
         // --- Admin : téléverser un installeur ---
         app.MapPost("/api/admin/packages", async (HttpRequest req, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!AdminEndpoints.IsAdmin(req.HttpContext, cfg)) return Results.Unauthorized();
             if (!req.HasFormContentType) return Results.BadRequest(new { error = "Envoi multipart attendu." });
 
             var form = await req.ReadFormAsync();
@@ -55,7 +54,6 @@ public static class PackageEndpoints
 
         app.MapGet("/api/admin/packages", async (HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!AdminEndpoints.IsAdmin(http, cfg)) return Results.Unauthorized();
             var list = (await db.Packages.ToListAsync())
                 .OrderByDescending(p => p.UploadedAt)
                 .Select(p => new { p.Id, p.Name, p.FileName, p.Os, p.SilentArgs, p.SizeBytes, p.UploadedAt });
@@ -65,7 +63,6 @@ public static class PackageEndpoints
         app.MapDelete("/api/admin/packages/{id:guid}", async (
             Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!AdminEndpoints.IsAdmin(http, cfg)) return Results.Unauthorized();
             var pkg = await db.Packages.FindAsync(id);
             if (pkg is null) return Results.NotFound();
             try { Directory.Delete(Path.Combine(PackagesDir(cfg), id.ToString()), recursive: true); } catch { }
@@ -79,7 +76,6 @@ public static class PackageEndpoints
             Guid machineId, DeployDto dto, HttpContext http, IConfiguration cfg,
             ReminaDbContext db, IHubContext<AgentHub> hub) =>
         {
-            if (!AdminEndpoints.IsAdmin(http, cfg)) return Results.Unauthorized();
             var machine = await db.Machines.FindAsync(machineId);
             if (machine is null) return Results.NotFound(new { error = "Poste inconnu." });
             var pkg = await db.Packages.FindAsync(dto.PackageId);
@@ -107,7 +103,6 @@ public static class PackageEndpoints
             Guid bureauId, DeployDto dto, HttpContext http, IConfiguration cfg,
             ReminaDbContext db, IHubContext<AgentHub> hub) =>
         {
-            if (!AdminEndpoints.IsAdmin(http, cfg)) return Results.Unauthorized();
             var pkg = await db.Packages.FindAsync(dto.PackageId);
             if (pkg is null) return Results.NotFound(new { error = "Paquet inconnu." });
             var machines = await db.Machines.Where(m => m.BureauId == bureauId).ToListAsync();

@@ -8,9 +8,8 @@ using Remina.Shared;
 namespace Remina.Server.Endpoints;
 
 /// <summary>
-/// Endpoints d'administration (console). Protégés par une clé d'API admin
-/// (en-tête X-Admin-Key) définie dans la configuration : Admin:ApiKey.
-/// En v0 c'est volontairement simple ; NounoursAccount prendra le relais plus tard.
+/// Endpoints d'administration (console). Toute la route /api/admin est protégée par
+/// AdminAuthMiddleware (compte connecté ; rôle admin pour les écritures).
 /// </summary>
 public static class AdminEndpoints
 {
@@ -21,7 +20,6 @@ public static class AdminEndpoints
         g.MapPost("/enrollment-codes", async (
             CreateEnrollmentCodeDto dto, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
 
             // Un bureau peut être attaché au code : les postes inscrits le rejoindront.
             if (dto.BureauId is not null && !await db.Bureaus.AnyAsync(b => b.Id == dto.BureauId))
@@ -49,7 +47,6 @@ public static class AdminEndpoints
         // Liste des codes d'inscription (actifs et utilisables en premier).
         g.MapGet("/enrollment-codes", async (HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             var now = DateTimeOffset.UtcNow;
             // SQLite ne trie pas les DateTimeOffset : on matérialise puis on trie en mémoire.
             var all = await db.EnrollmentCodes.ToListAsync();
@@ -67,7 +64,6 @@ public static class AdminEndpoints
         g.MapPost("/enrollment-codes/{id:guid}/revoke", async (
             Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             var c = await db.EnrollmentCodes.FindAsync(id);
             if (c is null) return Results.NotFound();
             c.IsRevoked = true;
@@ -80,7 +76,6 @@ public static class AdminEndpoints
         g.MapPost("/bureaus", async (
             CreateBureauDto dto, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             if (string.IsNullOrWhiteSpace(dto.Name))
                 return Results.BadRequest(new { error = "Nom de bureau requis." });
             if (await db.Bureaus.AnyAsync(b => b.Name == dto.Name))
@@ -99,7 +94,6 @@ public static class AdminEndpoints
 
         g.MapGet("/bureaus", async (HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
 
             var bureaus = await db.Bureaus
                 .OrderBy(b => b.Name)
@@ -116,7 +110,6 @@ public static class AdminEndpoints
         g.MapDelete("/bureaus/{id:guid}", async (
             Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             var b = await db.Bureaus.FindAsync(id);
             if (b is null) return Results.NotFound();
             db.Bureaus.Remove(b);
@@ -127,7 +120,6 @@ public static class AdminEndpoints
         g.MapGet("/bureaus/{id:guid}/machines", async (
             Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             if (!await db.Bureaus.AnyAsync(b => b.Id == id)) return Results.NotFound();
 
             var machines = await db.Machines
@@ -141,7 +133,6 @@ public static class AdminEndpoints
         // Tableau de bord : indicateurs + top applis du jour.
         g.MapGet("/stats", async (HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             var now = DateTimeOffset.UtcNow;
             var today = DateOnly.FromDateTime(DateTime.Now);
 
@@ -177,7 +168,6 @@ public static class AdminEndpoints
         g.MapGet("/machines/{id:guid}/commands", async (
             Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             var cmds = (await db.AgentCommands.Where(c => c.MachineId == id).ToListAsync())
                 .OrderByDescending(c => c.CreatedAt).Take(25)
                 .Select(c => new
@@ -194,7 +184,6 @@ public static class AdminEndpoints
         g.MapDelete("/machines/{id:guid}", async (
             Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             var machine = await db.Machines.FindAsync(id);
             if (machine is null) return Results.NotFound();
             db.Machines.Remove(machine);
@@ -206,7 +195,6 @@ public static class AdminEndpoints
         g.MapPost("/time-entries", async (
             CreateTimeEntryDto dto, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             if (string.IsNullOrWhiteSpace(dto.Project)) return Results.BadRequest(new { error = "Projet requis." });
             if (dto.End <= dto.Start) return Results.BadRequest(new { error = "La fin doit être après le début." });
 
@@ -225,7 +213,6 @@ public static class AdminEndpoints
         g.MapGet("/time-entries", async (
             string? from, string? to, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
 
             // SQLite ne trie pas les DateTimeOffset : on matérialise puis filtre/trie en mémoire.
             var all = await db.TimeEntries.ToListAsync();
@@ -242,7 +229,6 @@ public static class AdminEndpoints
         g.MapDelete("/time-entries/{id:guid}", async (
             Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             var e = await db.TimeEntries.FindAsync(id);
             if (e is null) return Results.NotFound();
             db.TimeEntries.Remove(e);
@@ -254,7 +240,6 @@ public static class AdminEndpoints
         g.MapGet("/recap", async (
             string? day, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             var d = DateOnly.TryParse(day, out var p) ? p : DateOnly.FromDateTime(DateTime.Now);
 
             var acts = await db.Activity.Where(a => a.Day == d).ToListAsync();
@@ -291,7 +276,6 @@ public static class AdminEndpoints
         g.MapGet("/machines/{id:guid}/activity", async (
             Guid id, string? day, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
 
             var d = DateOnly.TryParse(day, out var parsed)
                 ? parsed : DateOnly.FromDateTime(DateTime.Now);
@@ -310,7 +294,6 @@ public static class AdminEndpoints
         g.MapPost("/machines/{id:guid}/bureau", async (
             Guid id, AssignBureauDto dto, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
 
             var machine = await db.Machines.FindAsync(id);
             if (machine is null) return Results.NotFound();
@@ -327,7 +310,6 @@ public static class AdminEndpoints
         g.MapGet("/machines/{id:guid}", async (
             Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             var now = DateTimeOffset.UtcNow;
             var m = await db.Machines.Include(x => x.Bureau).FirstOrDefaultAsync(x => x.Id == id);
             if (m is null) return Results.NotFound();
@@ -346,7 +328,6 @@ public static class AdminEndpoints
         g.MapGet("/machines/{id:guid}/software", async (
             Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             var items = await db.Inventory.Where(i => i.MachineId == id)
                 .OrderBy(i => i.Name)
                 .Select(i => new { i.Name, i.Version }).ToListAsync();
@@ -357,7 +338,6 @@ public static class AdminEndpoints
         g.MapPost("/machines/{id:guid}/wake", async (
             Guid id, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             var m = await db.Machines.FindAsync(id);
             if (m is null) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(m.PrimaryMacAddress))
@@ -370,7 +350,6 @@ public static class AdminEndpoints
         g.MapPatch("/machines/{id:guid}", async (
             Guid id, RenameDto dto, HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
             if (string.IsNullOrWhiteSpace(dto.Name)) return Results.BadRequest(new { error = "Nom requis." });
             var m = await db.Machines.FindAsync(id);
             if (m is null) return Results.NotFound();
@@ -381,7 +360,6 @@ public static class AdminEndpoints
 
         g.MapGet("/machines", async (HttpContext http, IConfiguration cfg, ReminaDbContext db) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
 
             var now = DateTimeOffset.UtcNow;
             var machines = await db.Machines
@@ -405,7 +383,6 @@ public static class AdminEndpoints
             Guid id, QueueCommandDto dto, HttpContext http, IConfiguration cfg,
             ReminaDbContext db, IHubContext<AgentHub> hub) =>
         {
-            if (!IsAdmin(http, cfg)) return Results.Unauthorized();
 
             var machine = await db.Machines.FindAsync(id);
             if (machine is null) return Results.NotFound();
@@ -435,14 +412,6 @@ public static class AdminEndpoints
 
             return Results.Ok(new { cmd.Id, cmd.Type, cmd.Payload, cmd.CreatedAt });
         });
-    }
-
-    internal static bool IsAdmin(HttpContext http, IConfiguration cfg)
-    {
-        var expected = cfg["Admin:ApiKey"];
-        if (string.IsNullOrEmpty(expected)) return false; // pas de clé = admin fermé
-        var given = http.Request.Headers["X-Admin-Key"].ToString();
-        return !string.IsNullOrEmpty(given) && given == expected;
     }
 
     public record CreateEnrollmentCodeDto(string? Label, int MaxUses, int ExpiresInHours, Guid? BureauId);

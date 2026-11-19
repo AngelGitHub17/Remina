@@ -141,3 +141,54 @@ public class InventoryItem
     public string Name { get; set; } = "";
     public string? Version { get; set; }
 }
+
+/// <summary>Rôle d'un compte de la console.</summary>
+public enum AdminRole
+{
+    /// <summary>Consultation (et saisie de temps) ; aucune action sur le parc.</summary>
+    ReadOnly = 0,
+    /// <summary>Tous les droits, y compris la gestion des comptes.</summary>
+    Admin = 1,
+}
+
+/// <summary>Compte de la console d'administration.</summary>
+public class AdminUser
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    /// <summary>Identifiant de connexion (comparé en minuscules).</summary>
+    public string Username { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    /// <summary>Hachage PBKDF2 (voir PasswordHasher). Null pour un compte uniquement SSO.</summary>
+    public string? PasswordHash { get; set; }
+    public AdminRole Role { get; set; } = AdminRole.ReadOnly;
+    public bool IsDisabled { get; set; }
+    public int FailedLogins { get; set; }
+    public DateTimeOffset? LockoutUntil { get; set; }
+    /// <summary>Fournisseur d'identité externe (ex : « nounours »), réservé au SSO.</summary>
+    public string? ExternalProvider { get; set; }
+    public string? ExternalId { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? LastLoginAt { get; set; }
+}
+
+/// <summary>Session de console (cookie). Seul le hachage du jeton est stocké.</summary>
+public class AdminSession
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string TokenHash { get; set; } = "";
+    public Guid UserId { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    /// <summary>Expiration absolue.</summary>
+    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset LastSeenAt { get; set; } = DateTimeOffset.UtcNow;
+    public string? Ip { get; set; }
+    public string? UserAgent { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+}
+
+/// <summary>Réglage serveur modifiable depuis la console (clé/valeur).</summary>
+public class ServerSetting
+{
+    public string Key { get; set; } = "";
+    public string Value { get; set; } = "";
+}

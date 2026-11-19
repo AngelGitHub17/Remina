@@ -20,6 +20,25 @@ installateurs à une Release ; l'auto-mise à jour s'appuie dessus.
 - `ct/` — scripts Proxmox : `remina.sh` (création LXC), `remina-update.sh` (mise à jour serveur).
 - `.github/workflows/release.yml` — build 4 plateformes + installateurs Windows, Release sur tag.
 
+## Nouveautés v0.2.0 — Comptes & sécurité (axe A, itération 1)
+- **Comptes de console** (table `AdminUsers`) : identifiant, nom, mot de passe haché
+  PBKDF2-SHA256 600 000 itérations (rehachage transparent si le coût augmente), rôles
+  **Admin** / **Lecture seule** (consultation + saisie de temps). Colonnes `ExternalProvider`
+  / `ExternalId` réservées au SSO NounoursAccount.
+- **Sessions cookie** (table `AdminSessions`, seul le hachage du jeton est stocké) :
+  `HttpOnly`, `SameSite=Strict`, `Secure` en HTTPS ; 12 h d'inactivité / 7 j max ; révocables
+  (déconnexion, changement de mot de passe, compte désactivé). Anti-CSRF : en-tête `X-Remina: 1`.
+- **Protection centralisée** : `AdminAuthMiddleware` protège tout `/api/admin/*` (les 28
+  vérifications `IsAdmin` recopiées ont disparu) ; écriture = admin par défaut.
+- **Migration de la clé** : sans compte, la console propose « Première configuration »
+  (preuve = `Admin:ApiKey`). La clé `X-Admin-Key` reste acceptée pour les scripts jusqu'à
+  sa désactivation (Comptes, table `ServerSettings`, ou `Admin:LegacyKeyEnabled=false`).
+  Recours : `Remina.Server --reset-admin <identifiant>`.
+- **Durcissement** : verrouillage 15 min après 5 échecs, 10 tentatives/min/IP, en-têtes CSP /
+  X-Frame-Options / nosniff, `no-store` sur l'API, proxys de confiance
+  (`Remina:TrustedProxies`) pour l'IP réelle et le HTTPS derrière Nginx.
+- `/log.html` a sa propre connexion par compte ; `/recap.html` utilise la session de la console.
+
 ## Nouveautés v0.1.15
 - **Correctif « poste désinscrit après redémarrage »** (régression v0.1.12) : l'identifiant
   matériel hachait la MAC de la *première carte « Up »*. Au démarrage, une carte virtuelle
@@ -90,6 +109,34 @@ installateurs à une Release ; l'auto-mise à jour s'appuie dessus.
 - Un agent/serveur sur une version **antérieure au correctif d'auto-update (v0.1.11)** doit
   être mis à jour **manuellement une fois** (réinstaller l'agent, lancer `ct/remina-update.sh`
   pour le serveur) ; ensuite l'auto-update s'enchaîne seul.
+
+## Axe A — suite prévue
+- **v0.2.1** : journal d'audit (qui / quoi / quand / IP, connexions réussies et échouées,
+  toutes les écritures), vue filtrable dans la console, **purge automatique** (365 j par
+  défaut, réglable) ; **jetons d'API par compte** (remplacent la clé historique pour les
+  scripts, révocables, rôle du compte).
+- **v0.2.2** : connexion **NounoursAccount** (redirection de login + vérification serveur à
+  serveur ; création automatique du compte à la 1re connexion ; déconnexion NounoursAccount →
+  session Remina coupée). Protocole à caler avec le code PHP de NounoursAccount.
+
+## Idées pour la console (panel)
+- **Vue Postes** : filtres rapides (en ligne / hors ligne / RDP / bureau / OS / version
+  d'agent obsolète), tri par colonne, sélection multiple + actions groupées (verrouiller,
+  message, déployer), export CSV.
+- **Fiche poste enrichie** : onglets (Inventaire, Activité, Commandes, Logiciels,
+  Historique), notes libres / étiquettes, n° d'inventaire, date d'achat & garantie,
+  utilisateur attitré, historique « vu en ligne » (frise de disponibilité 7 j).
+- **Tableau de bord** : postes hors ligne depuis > X jours, agents à mettre à jour, disque
+  presque plein (avec l'axe B), dernières commandes en échec, graphe d'activité sur 7 jours.
+- **Recherche globale** (Ctrl+K) : postes, logiciels installés (« qui a encore Chrome 118 ? »),
+  utilisateurs, bureaux.
+- **Comparaison logicielle** : matrice logiciel × poste, écarts entre postes d'un même bureau.
+- **Mode sombre/clair** et densité compacte ; vue mobile utilisable (sidebar repliable).
+- **Notifications temps réel** dans la console (poste qui se connecte, commande terminée)
+  via un hub SignalR « console ».
+- **Plan des bureaux** : vue par bureau avec ses postes en cartes (état, utilisateur).
+- **Planification de commandes** : redémarrage/verrouillage programmé, par poste ou bureau.
+- **Préférences par compte** : vue d'accueil, colonnes affichées, fuseau horaire.
 
 ## Feuille de route v0.2.0 (à décider / construire)
 - **A. Comptes & sécurité** : vrais comptes admin + rôles (admin / lecture seule), fin de la

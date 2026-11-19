@@ -115,9 +115,53 @@ sur le poste. API : `POST/GET/DELETE /api/admin/packages`,
 
 Le serveur sert une console d'administration à sa racine (`http://SERVER:5080/`) :
 postes (état en ligne/RDP, utilisateur, rattachement à un bureau, commandes), bureaux
-(liste/création) et génération de codes d'inscription. Elle s'authentifie avec la clé
-admin (`X-Admin-Key`), conservée le temps de la session du navigateur. La liste des postes
-se rafraîchit toute seule toutes les 20 s.
+(liste/création) et génération de codes d'inscription. La liste des postes se rafraîchit
+toute seule toutes les 20 s.
+
+### Comptes & connexion (depuis v0.2.0)
+
+- **Premier démarrage** : la console propose « Première configuration » ; saisis la clé
+  `Admin__ApiKey` du serveur comme preuve et crée le premier compte **admin**.
+- **Rôles** : *Admin* (tous les droits) ou *Lecture seule* (consultation + saisie de temps).
+  Section **Comptes** : créer, désactiver, réinitialiser un mot de passe, fermer les sessions.
+- **Session** : cookie `HttpOnly`, `SameSite=Strict`, `Secure` en HTTPS ; 12 h d'inactivité,
+  7 jours max (`Remina__Auth__IdleHours`, `Remina__Auth__SessionDays`). Mots de passe
+  hachés en PBKDF2-SHA256 (600 000 itérations), 12 caractères minimum ; verrouillage 15 min
+  après 5 échecs, 10 tentatives/min/IP.
+- **Clé historique `X-Admin-Key`** : toujours acceptée pour les scripts (droits admin) tant
+  qu'elle n'est pas désactivée dans **Comptes → Clé d'administration historique** (ou
+  forcée hors service avec `Admin__LegacyKeyEnabled=false`). La clé d'exemple
+  `change-me-admin-key` n'est acceptée que depuis le serveur lui-même.
+- **Accès perdu** : sur le serveur, depuis le dossier d'installation :
+  `sudo -u remina ./Remina.Server --reset-admin <identifiant>` (Proxmox : `cd /opt/remina/server`)
+  → affiche un mot de passe temporaire.
+
+### Derrière Nginx (HTTPS)
+
+Remina ne croit les en-têtes `X-Forwarded-*` (IP réelle, HTTPS → cookie `Secure`) que
+venant d'un proxy déclaré. Déclare l'IP de ton Nginx (sauf s'il tourne sur la même machine) :
+`Remina__TrustedProxies__0=192.168.1.10` (ou un réseau : `192.168.1.0/24`) dans
+`/etc/remina/server.env`.
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name remina.example.fr;
+    # ssl_certificate ... ;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    client_max_body_size 4g;              # téléversement d'installeurs
+    location / {
+        proxy_pass http://IP_DU_LXC:5080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;               # WebSockets (SignalR agents)
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+server { listen 80; server_name remina.example.fr; return 301 https://$host$request_uri; }
+```
 
 ## Démarrer le serveur (depuis les sources)
 
@@ -159,13 +203,18 @@ un heartbeat toutes les 30 s. Le poste apparaît dans `GET /api/admin/machines`.
 | GET | `/` `/health` | — | Version, état |
 | POST | `/api/agent/enroll` | code | Inscription d'un poste |
 | POST | `/api/agent/heartbeat` | jeton agent | État + récupération d'ordres |
-| POST | `/api/admin/enrollment-codes` | clé admin | Créer un code d'inscription (option `bureauId`) |
-| GET | `/api/admin/machines` | clé admin | Lister les postes (avec leur bureau) |
-| POST | `/api/admin/machines/{id}/commands` | clé admin | Mettre un ordre en file |
-| POST | `/api/admin/bureaus` | clé admin | Créer un bureau (local) |
-| GET | `/api/admin/bureaus` | clé admin | Lister les bureaux + nombre de postes |
-| GET | `/api/admin/bureaus/{id}/machines` | clé admin | Postes d'un bureau |
-| POST | `/api/admin/machines/{id}/bureau` | clé admin | Rattacher/détacher un poste d'un bureau |
+| GET | `/api/auth/status` | — | Configuration initiale requise ? utilisateur connecté |
+| POST | `/api/auth/bootstrap` · `/login` · `/logout` | — / session | Premier compte, connexion, déconnexion |
+| POST | `/api/auth/me/password` | session | Changer son mot de passe |
+| GET/POST/PUT/DELETE | `/api/admin/users[/{id}]` | admin | Gestion des comptes |
+| GET/PUT | `/api/admin/settings` | admin | Clé historique on/off |
+| POST | `/api/admin/enrollment-codes` | admin | Créer un code d'inscription (option `bureauId`) |
+| GET | `/api/admin/machines` | admin | Lister les postes (avec leur bureau) |
+| POST | `/api/admin/machines/{id}/commands` | admin | Mettre un ordre en file |
+| POST | `/api/admin/bureaus` | admin | Créer un bureau (local) |
+| GET | `/api/admin/bureaus` | admin | Lister les bureaux + nombre de postes |
+| GET | `/api/admin/bureaus/{id}/machines` | admin | Postes d'un bureau |
+| POST | `/api/admin/machines/{id}/bureau` | admin | Rattacher/détacher un poste d'un bureau |
 
 Types d'ordres : `1` verrouiller, `2` redémarrer, `3` message, `4` ticket récapitulatif,
 `5` connexion automatique.

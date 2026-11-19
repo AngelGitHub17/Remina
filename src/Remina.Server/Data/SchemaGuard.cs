@@ -55,6 +55,39 @@ public static class SchemaGuard
                 ""Name"" TEXT NOT NULL,
                 ""Version"" TEXT NULL);",
             @"CREATE INDEX IF NOT EXISTS ""IX_Inventory_MachineId"" ON ""Inventory"" (""MachineId"");",
+
+            // v0.2.0 — comptes, sessions, réglages.
+            @"CREATE TABLE IF NOT EXISTS ""AdminUsers"" (
+                ""Id"" TEXT NOT NULL CONSTRAINT ""PK_AdminUsers"" PRIMARY KEY,
+                ""Username"" TEXT NOT NULL,
+                ""DisplayName"" TEXT NOT NULL,
+                ""PasswordHash"" TEXT NULL,
+                ""Role"" INTEGER NOT NULL,
+                ""IsDisabled"" INTEGER NOT NULL,
+                ""FailedLogins"" INTEGER NOT NULL,
+                ""LockoutUntil"" TEXT NULL,
+                ""ExternalProvider"" TEXT NULL,
+                ""ExternalId"" TEXT NULL,
+                ""CreatedAt"" TEXT NOT NULL,
+                ""LastLoginAt"" TEXT NULL);",
+            @"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_AdminUsers_Username"" ON ""AdminUsers"" (""Username"");",
+
+            @"CREATE TABLE IF NOT EXISTS ""AdminSessions"" (
+                ""Id"" TEXT NOT NULL CONSTRAINT ""PK_AdminSessions"" PRIMARY KEY,
+                ""TokenHash"" TEXT NOT NULL,
+                ""UserId"" TEXT NOT NULL,
+                ""CreatedAt"" TEXT NOT NULL,
+                ""ExpiresAt"" TEXT NOT NULL,
+                ""LastSeenAt"" TEXT NOT NULL,
+                ""Ip"" TEXT NULL,
+                ""UserAgent"" TEXT NULL,
+                ""RevokedAt"" TEXT NULL);",
+            @"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_AdminSessions_TokenHash"" ON ""AdminSessions"" (""TokenHash"");",
+            @"CREATE INDEX IF NOT EXISTS ""IX_AdminSessions_UserId"" ON ""AdminSessions"" (""UserId"");",
+
+            @"CREATE TABLE IF NOT EXISTS ""ServerSettings"" (
+                ""Key"" TEXT NOT NULL CONSTRAINT ""PK_ServerSettings"" PRIMARY KEY,
+                ""Value"" TEXT NOT NULL);",
         };
 
         foreach (var s in sql)

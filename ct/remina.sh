@@ -127,6 +127,9 @@ echo -e "   ${BL}URL${CL}        : http://${IP}:${PORT}/"
 echo -e "   ${BL}Clé admin${CL}  : ${ADMIN_KEY}"
 echo -e "   ${BL}En-tête${CL}    : X-Admin-Key: ${ADMIN_KEY}"
 echo
+info "Ouvre la console : « Première configuration » → saisis la clé admin ci-dessus et"
+info "crée ton compte. Ensuite, désactive la clé dans Comptes si tes scripts n'en ont plus besoin."
+echo
 info "Créer un code d'inscription :"
 echo "   curl -X POST http://${IP}:${PORT}/api/admin/enrollment-codes \\"
 echo "     -H 'X-Admin-Key: ${ADMIN_KEY}' -H 'Content-Type: application/json' \\"

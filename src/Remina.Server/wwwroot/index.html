@@ -69,14 +69,36 @@
   .toast{position:fixed;bottom:18px;right:18px;background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent);padding:10px 14px;border-radius:8px;max-width:360px;box-shadow:0 8px 30px rgba(0,0,0,.4);z-index:60;}
   .toast.err{border-left-color:var(--danger);}
   .gate{max-width:420px;margin:12vh auto;}
+  .gate label{display:block;color:var(--muted);font-size:12px;margin:10px 0 4px;}
+  .gate input{width:100%;}
+  .gate button{width:100%;margin-top:14px;}
+  body.ro .adm{display:none!important;}
+  .banner{background:rgba(245,166,35,.1);border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:10px 14px;margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .banner span{flex:1;}
+  .me{padding:8px 10px 10px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);margin-bottom:8px;}
+  .me b{color:var(--txt);display:block;font-size:13px;}
+  .foot .row button{flex:1;}
 </style>
 </head>
 <body>
 
-<div id="gate" class="gate card">
-  <h2>Connexion à la console</h2>
-  <p class="muted">Clé d'administration (<code>X-Admin-Key</code>) :</p>
-  <div class="row"><input id="keyInput" type="password" placeholder="Clé d'administration" style="flex:1"><button onclick="login()">Entrer</button></div>
+<div id="gate" class="gate card hide">
+  <form id="loginForm" onsubmit="event.preventDefault();login()">
+    <h2>Connexion à la console</h2>
+    <label for="liUser">Identifiant</label><input id="liUser" autocomplete="username" autocapitalize="none">
+    <label for="liPass">Mot de passe</label><input id="liPass" type="password" autocomplete="current-password">
+    <button type="submit">Se connecter</button>
+  </form>
+  <form id="setupForm" class="hide" onsubmit="event.preventDefault();bootstrap()">
+    <h2>Première configuration</h2>
+    <p class="muted">Aucun compte n'existe encore. Crée le premier compte administrateur ; la clé d'administration du serveur (<code>Admin__ApiKey</code>) sert de preuve.</p>
+    <label for="suKey">Clé d'administration du serveur</label><input id="suKey" type="password" autocomplete="off">
+    <label for="suUser">Identifiant</label><input id="suUser" autocomplete="username" autocapitalize="none">
+    <label for="suName">Nom affiché</label><input id="suName">
+    <label for="suPass">Mot de passe (12 caractères min.)</label><input id="suPass" type="password" autocomplete="new-password">
+    <label for="suPass2">Confirmation</label><input id="suPass2" type="password" autocomplete="new-password">
+    <button type="submit">Créer le compte et entrer</button>
+  </form>
   <p id="gateErr" style="color:var(--danger)"></p>
 </div>
 
@@ -92,12 +114,17 @@
       <a data-v="software" onclick="nav('software')"><span class="i">⇩</span> Logiciels</a>
       <a data-v="recap" onclick="nav('recap')"><span class="i">🧾</span> Récap</a>
       <a data-v="codes" onclick="nav('codes')"><span class="i">⚷</span> Codes</a>
+      <a data-v="accounts" class="adm" onclick="nav('accounts')"><span class="i">☺</span> Comptes</a>
     </nav>
-    <div class="foot"><button class="sec" style="width:100%" onclick="logout()">Quitter</button></div>
+    <div class="foot">
+      <div class="me"><b id="meName">—</b><span id="meRole"></span></div>
+      <div class="row"><button class="sec" onclick="openMyAccount()">Mon compte</button><button class="sec" onclick="logout()">Quitter</button></div>
+    </div>
   </aside>
 
   <main id="main">
     <div class="top"><h1 id="title">Tableau de bord</h1><div class="spacer"></div><button class="sec" onclick="refresh()">Rafraîchir</button></div>
+    <div id="legacyBanner" class="banner adm hide"><span>⚠ La clé historique <code>X-Admin-Key</code> est encore acceptée. Une fois tes comptes créés (et tes scripts migrés), désactive-la.</span><button class="sec" onclick="nav('accounts')">Gérer</button></div>
 
     <!-- DASHBOARD -->
     <section id="v-dash">
@@ -120,7 +147,7 @@
           <span class="muted" id="machCount"></span>
         </div>
         <table>
-          <thead><tr><th>État</th><th>Nom</th><th>OS</th><th>Utilisateur</th><th>Bureau</th><th>Vu</th><th>Actions</th></tr></thead>
+          <thead><tr><th>État</th><th>Nom</th><th>OS</th><th>Utilisateur</th><th>Bureau</th><th>Vu</th><th class="adm">Actions</th></tr></thead>
           <tbody id="machinesBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
         </table>
       </div>
@@ -128,7 +155,7 @@
 
     <!-- BUREAUS -->
     <section id="v-bureaus" class="hide">
-      <div class="card"><h2>Nouveau bureau</h2>
+      <div class="card adm"><h2>Nouveau bureau</h2>
         <div class="row"><input id="buName" placeholder="Nom (ex : Bureau Salon)"><input id="buLoc" placeholder="Emplacement"><input id="buDesc" placeholder="Description" style="flex:1"><button onclick="createBureau()">Créer</button></div>
       </div>
       <div class="card"><h2>Bureaux</h2>
@@ -147,7 +174,7 @@
 
     <!-- SOFTWARE -->
     <section id="v-software" class="hide">
-      <div class="card"><h2>Téléverser un installeur</h2>
+      <div class="card adm"><h2>Téléverser un installeur</h2>
         <div class="row">
           <input id="pkFile" type="file" style="flex:1">
           <input id="pkName" placeholder="Nom (optionnel)">
@@ -159,7 +186,7 @@
         <p class="muted" style="font-size:12px;margin-top:8px">Windows : .msi (/qn auto) ou .exe + args silencieux de l'installeur. Linux : .deb, .sh, .run. macOS : .pkg. L'installation requiert l'agent service / root sur le poste.</p>
       </div>
       <div class="card"><h2>Logiciels déployables</h2>
-        <table><thead><tr><th>Nom</th><th>Fichier</th><th>OS</th><th>Taille</th><th>Déployer vers</th><th></th></tr></thead>
+        <table><thead><tr><th>Nom</th><th>Fichier</th><th>OS</th><th>Taille</th><th class="adm">Déployer vers</th><th class="adm"></th></tr></thead>
         <tbody id="pkBody"><tr><td colspan="6" class="muted">Chargement…</td></tr></tbody></table>
       </div>
     </section>
@@ -178,7 +205,7 @@
 
     <!-- CODES -->
     <section id="v-codes" class="hide">
-      <div class="card"><h2>Générer un code</h2>
+      <div class="card adm"><h2>Générer un code</h2>
         <div class="row"><input id="cdLabel" placeholder="Libellé"><input id="cdUses" type="number" value="1" min="1" style="width:90px" title="Utilisations"><input id="cdHours" type="number" value="24" min="0" style="width:110px" title="Expiration (h)"><select id="cdBureau"><option value="">— Sans bureau —</option></select><button onclick="createCode()">Générer</button></div>
         <div id="codeOut" class="hide" style="margin-top:12px"></div>
       </div>
@@ -187,48 +214,152 @@
         <tbody id="codesBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody></table>
       </div>
     </section>
+    <!-- ACCOUNTS -->
+    <section id="v-accounts" class="hide">
+      <div class="card"><h2>Nouveau compte</h2>
+        <div class="row"><input id="acUser" placeholder="Identifiant" autocapitalize="none"><input id="acName" placeholder="Nom affiché"><input id="acPass" type="password" placeholder="Mot de passe (12 car. min.)" autocomplete="new-password"><select id="acRole"><option value="0">Lecture seule</option><option value="1">Admin</option></select><button onclick="createUser()">Créer</button></div>
+        <p class="muted" style="font-size:12px;margin:8px 0 0">Lecture seule : consulte tout et saisit du temps, sans aucune action sur les postes ni les réglages.</p>
+      </div>
+      <div class="card"><h2>Comptes</h2>
+        <table><thead><tr><th>Identifiant</th><th>Nom</th><th>Rôle</th><th>État</th><th>Dernière connexion</th><th>Sessions</th><th></th></tr></thead>
+        <tbody id="usersBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody></table>
+      </div>
+      <div class="card"><h2>Clé d'administration historique</h2>
+        <div id="legacyBox" class="muted">—</div>
+      </div>
+    </section>
   </main>
 
   <div id="modal" class="modal hide" onclick="if(event.target===this)closeModal()">
-    <div class="box"><h1>Détail du poste <button onclick="closeModal()">Fermer</button></h1><div id="modalBody"></div></div>
+    <div class="box"><h1><span id="modalTitle">Détail du poste</span> <button onclick="closeModal()">Fermer</button></h1><div id="modalBody"></div></div>
   </div>
 </div>
 
 <script>
-const State={key:"",machines:[],bureaus:[]};
+const State={me:null,machines:[],bureaus:[]};
 const CMD={Lock:1,Reboot:2,ShowMessage:3,PrintSummaryTicket:4,AutoLogin:5};
 const CMDNAME={0:"—",1:"Verrouiller",2:"Redémarrer",3:"Message",4:"Ticket",5:"Auto-login",6:"Installation"};
 const OS={0:"Inconnu",1:"Windows",2:"macOS",3:"Linux"};
 const $=id=>document.getElementById(id);
 
 function toast(m,err=false){const t=document.createElement("div");t.className="toast"+(err?" err":"");t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),3500);}
-async function api(path,opts={}){opts.headers=Object.assign({"X-Admin-Key":State.key,"Content-Type":"application/json"},opts.headers||{});const r=await fetch(path,opts);if(r.status===401){logout();throw new Error("Clé refusée.");}if(!r.ok)throw new Error("Erreur "+r.status);return r.status===204?null:r.json();}
+async function api(path,opts={}){
+  opts.headers=Object.assign({"X-Remina":"1","Content-Type":"application/json"},opts.headers||{});
+  opts.credentials="same-origin";
+  const r=await fetch(path,opts);
+  let data=null;try{data=r.status===204?null:await r.json();}catch(_){}
+  if(r.status===401&&!path.startsWith("/api/auth/")){showGate();throw new Error("Session expirée : reconnecte-toi.");}
+  if(!r.ok)throw new Error((data&&data.error)||(r.status===403?"Droits insuffisants.":r.status===429?"Trop de tentatives, patiente une minute.":"Erreur "+r.status));
+  return data;
+}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function fmtDur(s){const h=Math.floor(s/3600),m=Math.round((s%3600)/60);return h>0?h+" h "+(m<10?"0":"")+m:m+" min";}
 function durM(m){const h=Math.floor(m/60);return(h>0?h+" h ":"")+((m%60<10&&h>0)?"0":"")+(m%60)+" min";}
 function ago(iso){if(!iso)return"jamais";const s=Math.floor((Date.now()-new Date(iso))/1000);if(s<60)return"il y a "+s+" s";if(s<3600)return"il y a "+Math.floor(s/60)+" min";if(s<86400)return"il y a "+Math.floor(s/3600)+" h";return"il y a "+Math.floor(s/86400)+" j";}
 function bars(items,label,value,max){max=max||Math.max(1,...items.map(value));return items.length?items.map(it=>`<div class="bar"><span>${esc(label(it))}</span><div class="track"><div class="fill" style="width:${Math.round(value(it)*100/max)}%"></div></div><span class="val">${value(it)>=3600||value(it)<60?fmtDur(value(it)):value(it)}</span></div>`).join(""):'<span class="muted">Aucune donnée.</span>';}
 
+/* AUTH */
+async function boot(){
+  try{
+    const st=await api("/api/auth/status");
+    if(st.user)return enter(st.user,st.legacyKeyEnabled);
+    showGate(st.setupRequired);
+  }catch(e){showGate();$("gateErr").textContent=e.message;}
+}
+function showGate(setup=false){
+  State.me=null;$("shell").classList.add("hide");$("gate").classList.remove("hide");closeModal();
+  $("loginForm").classList.toggle("hide",setup);$("setupForm").classList.toggle("hide",!setup);
+  (setup?$("suKey"):$("liUser")).focus();
+}
 async function login(){
-  State.key=$("keyInput").value.trim();if(!State.key)return;
-  try{await api("/api/admin/stats");sessionStorage.setItem("remina_key",State.key);
-    $("gate").classList.add("hide");$("shell").classList.remove("hide");
-    const v=await(await fetch("/api/version")).json().catch(()=>null);if(v)$("ver").textContent=v.version||"";
-    refresh();
+  $("gateErr").textContent="";
+  try{await api("/api/auth/login",{method:"POST",body:JSON.stringify({username:$("liUser").value.trim(),password:$("liPass").value})});
+    $("liPass").value="";await afterLogin();
   }catch(e){$("gateErr").textContent=e.message;}
 }
-function logout(){sessionStorage.removeItem("remina_key");State.key="";$("shell").classList.add("hide");$("gate").classList.remove("hide");}
+async function bootstrap(){
+  $("gateErr").textContent="";
+  if($("suPass").value!==$("suPass2").value)return $("gateErr").textContent="Les mots de passe ne correspondent pas.";
+  try{await api("/api/auth/bootstrap",{method:"POST",body:JSON.stringify({adminKey:$("suKey").value,username:$("suUser").value.trim(),displayName:$("suName").value.trim()||null,password:$("suPass").value})});
+    $("suKey").value=$("suPass").value=$("suPass2").value="";toast("Compte créé. Bienvenue !");await afterLogin();
+  }catch(e){$("gateErr").textContent=e.message;}
+}
+async function afterLogin(){
+  const next=new URLSearchParams(location.search).get("next");
+  if(next&&/^\/[^\/\\]/.test(next)){location.href=next;return;}
+  const st=await api("/api/auth/status");if(st.user)enter(st.user,st.legacyKeyEnabled);else showGate();
+}
+async function enter(me,legacy){
+  State.me=me;document.body.classList.toggle("ro",!me.isAdmin);
+  $("meName").textContent=me.displayName;$("meRole").textContent=me.isAdmin?"Administrateur":"Lecture seule";
+  $("legacyBanner").classList.toggle("hide",!legacy||!me.isAdmin);
+  $("gate").classList.add("hide");$("shell").classList.remove("hide");
+  const v=await(await fetch("/api/version")).json().catch(()=>null);if(v)$("ver").textContent=v.version||"";
+  refresh();
+}
+async function logout(){try{await api("/api/auth/logout",{method:"POST"});}catch(_){}showGate();}
+function openMyAccount(){
+  $("modalTitle").textContent="Mon compte";
+  $("modalBody").innerHTML=`
+    <div class="kv"><span class="muted">Identifiant</span><span>${esc(State.me.username)}</span></div>
+    <div class="kv"><span class="muted">Rôle</span><span>${State.me.isAdmin?"Administrateur":"Lecture seule"}</span></div>
+    ${State.me.method==="session"?`<h2 style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Changer de mot de passe</h2>
+    <div class="row"><input id="pwCur" type="password" placeholder="Actuel" autocomplete="current-password"><input id="pwNew" type="password" placeholder="Nouveau (12 car. min.)" autocomplete="new-password"><input id="pwNew2" type="password" placeholder="Confirmation" autocomplete="new-password"><button onclick="changeMyPassword()">Changer</button></div>
+    <p class="muted" style="font-size:12px">Tes autres sessions ouvertes seront fermées.</p>`:""}`;
+  $("modal").classList.remove("hide");
+}
+async function changeMyPassword(){
+  if($("pwNew").value!==$("pwNew2").value)return toast("Les mots de passe ne correspondent pas.",true);
+  try{await api("/api/auth/me/password",{method:"POST",body:JSON.stringify({currentPassword:$("pwCur").value,newPassword:$("pwNew").value})});toast("Mot de passe changé.");closeModal();}catch(e){toast(e.message,true);}
+}
 
-const TITLES={dash:"Tableau de bord",machines:"Postes",bureaus:"Bureaux",activity:"Activité",software:"Logiciels",recap:"Récap",codes:"Codes d'inscription"};
+/* ACCOUNTS */
+async function loadAccounts(){
+  const body=$("usersBody");
+  try{
+    const[users,st]=await Promise.all([api("/api/admin/users"),api("/api/admin/settings")]);
+    body.innerHTML=users.map(u=>{const self=State.me&&u.id===State.me.userId;return `<tr>
+      <td><b>${esc(u.username)}</b>${self?' <span class="tag">toi</span>':''}</td><td>${esc(u.displayName)}</td>
+      <td><select ${self?'disabled':''} onchange="updateUser('${u.id}',{role:parseInt(this.value)})"><option value="0" ${u.role===0?'selected':''}>Lecture seule</option><option value="1" ${u.role===1?'selected':''}>Admin</option></select></td>
+      <td>${u.isDisabled?'<span class="dot off"></span>désactivé':(u.locked?'<span class="tag rdp">verrouillé</span>':'<span class="dot on"></span>actif')}</td>
+      <td class="muted">${u.lastLoginAt?ago(u.lastLoginAt):'jamais'}</td><td>${u.activeSessions}</td>
+      <td class="row">${self?'':`<button class="sec" onclick="resetUserPassword('${u.id}','${esc(u.username)}')">Mot de passe</button>
+        ${u.locked?`<button class="sec" onclick="updateUser('${u.id}',{unlock:true})">Déverrouiller</button>`:''}
+        <button class="sec" onclick="updateUser('${u.id}',{isDisabled:${!u.isDisabled}})">${u.isDisabled?'Réactiver':'Désactiver'}</button>
+        ${u.activeSessions?`<button class="sec" onclick="revokeSessions('${u.id}')">Déconnecter</button>`:''}
+        <button class="danger" onclick="deleteUser('${u.id}','${esc(u.username)}')">✕</button>`}</td></tr>`;}).join("");
+    const lb=$("legacyBox");
+    if(!st.legacyKeyConfigured)lb.innerHTML="Aucune clé configurée sur le serveur : seule la connexion par compte est possible.";
+    else if(st.legacyKeyForcedOff)lb.innerHTML="Désactivée par la configuration du serveur (<code>Admin__LegacyKeyEnabled=false</code>).";
+    else lb.innerHTML=st.legacyKeyEnabled
+      ?`<div class="row"><span style="flex:1">La clé <code>X-Admin-Key</code> est <b style="color:var(--warn)">acceptée</b> (droits admin complets, pour les scripts). Désactive-la une fois tes comptes en place.</span><button class="danger" onclick="setLegacy(false)">Désactiver la clé</button></div>`
+      :`<div class="row"><span style="flex:1">La clé <code>X-Admin-Key</code> est <b style="color:var(--ok)">désactivée</b> : seule la connexion par compte est acceptée.</span><button class="sec" onclick="setLegacy(true)">Réactiver</button></div>`;
+    $("legacyBanner").classList.toggle("hide",!st.legacyKeyEnabled);
+  }catch(e){toast(e.message,true);}
+}
+async function createUser(){
+  try{await api("/api/admin/users",{method:"POST",body:JSON.stringify({username:$("acUser").value.trim(),displayName:$("acName").value.trim()||null,password:$("acPass").value,role:parseInt($("acRole").value)})});
+    $("acUser").value=$("acName").value=$("acPass").value="";toast("Compte créé.");loadAccounts();}catch(e){toast(e.message,true);}
+}
+async function updateUser(id,patch){try{await api("/api/admin/users/"+id,{method:"PUT",body:JSON.stringify(patch)});toast("Enregistré.");}catch(e){toast(e.message,true);}loadAccounts();}
+async function resetUserPassword(id,name){const p=prompt(`Nouveau mot de passe pour « ${name} » (12 caractères min.) :`);if(!p)return;try{await api(`/api/admin/users/${id}/password`,{method:"POST",body:JSON.stringify({password:p})});toast("Mot de passe réinitialisé ; ses sessions sont fermées.");loadAccounts();}catch(e){toast(e.message,true);}}
+async function revokeSessions(id){try{const r=await api(`/api/admin/users/${id}/revoke-sessions`,{method:"POST"});toast(r.revoked+" session(s) fermée(s).");loadAccounts();}catch(e){toast(e.message,true);}}
+async function deleteUser(id,name){if(!confirm(`Supprimer le compte « ${name} » ?`))return;try{await api("/api/admin/users/"+id,{method:"DELETE"});toast("Supprimé.");loadAccounts();}catch(e){toast(e.message,true);}}
+async function setLegacy(on){if(on&&!confirm("Réactiver la clé historique ?"))return;try{await api("/api/admin/settings",{method:"PUT",body:JSON.stringify({legacyKeyEnabled:on})});toast(on?"Clé réactivée.":"Clé désactivée.");loadAccounts();}catch(e){toast(e.message,true);}}
+
+const TITLES={dash:"Tableau de bord",machines:"Postes",bureaus:"Bureaux",activity:"Activité",software:"Logiciels",recap:"Récap",codes:"Codes d'inscription",accounts:"Comptes & sécurité"};
 function nav(v){
   document.querySelectorAll("#side nav a").forEach(a=>a.classList.toggle("active",a.dataset.v===v));
-  ["dash","machines","bureaus","activity","software","recap","codes"].forEach(n=>$("v-"+n).classList.toggle("hide",n!==v));
+  if(v==="accounts"&&!(State.me&&State.me.isAdmin))v="dash";
+  document.querySelectorAll("#side nav a").forEach(a=>a.classList.toggle("active",a.dataset.v===v));
+  ["dash","machines","bureaus","activity","software","recap","codes","accounts"].forEach(n=>$("v-"+n).classList.toggle("hide",n!==v));
   $("title").textContent=TITLES[v];
   if(v==="dash")loadDash();
   if(v==="activity")fillActivityMachines();
   if(v==="software")loadPackages();
   if(v==="recap")initRecap();
   if(v==="codes")loadCodes();
+  if(v==="accounts")loadAccounts();
 }
 
 /* SOFTWARE */
@@ -240,9 +371,9 @@ async function uploadPackage(){
   try{
     const xhr=new XMLHttpRequest();
     await new Promise((res,rej)=>{
-      xhr.open("POST","/api/admin/packages");xhr.setRequestHeader("X-Admin-Key",State.key);
+      xhr.open("POST","/api/admin/packages");xhr.setRequestHeader("X-Remina","1");
       xhr.upload.onprogress=e=>{if(e.lengthComputable)$("pkProgress").textContent="Envoi : "+Math.round(e.loaded*100/e.total)+"%";};
-      xhr.onload=()=>xhr.status<300?res():rej(new Error("HTTP "+xhr.status));
+      xhr.onload=()=>{if(xhr.status<300)return res();let m="HTTP "+xhr.status;try{m=JSON.parse(xhr.responseText).error||m;}catch(_){}if(xhr.status===401)showGate();rej(new Error(m));};
       xhr.onerror=()=>rej(new Error("Échec réseau"));xhr.send(fd);
     });
     $("pkProgress").textContent="";$("pkName").value=$("pkArgs").value="";$("pkFile").value="";
@@ -257,8 +388,8 @@ async function loadPackages(){
     const bopts=State.bureaus.map(b=>`<option value="b:${b.id}">${esc(b.name)}</option>`).join("");
     body.innerHTML=pkgs.length?pkgs.map(p=>`<tr>
       <td>${esc(p.name)}</td><td class="muted">${esc(p.fileName)}</td><td>${OS[p.os]||'?'}</td><td class="muted">${fmtSize(p.sizeBytes)}</td>
-      <td><select id="dep-${p.id}"><option value="">— Cible —</option><optgroup label="Postes">${mopts}</optgroup><optgroup label="Bureaux">${bopts}</optgroup></select></td>
-      <td class="row"><button class="sec" onclick="deployPackage('${p.id}')">Déployer</button><button class="danger" onclick="delPackage('${p.id}','${esc(p.name)}')">✕</button></td>
+      <td class="adm"><select id="dep-${p.id}"><option value="">— Cible —</option><optgroup label="Postes">${mopts}</optgroup><optgroup label="Bureaux">${bopts}</optgroup></select></td>
+      <td class="row adm"><button class="sec" onclick="deployPackage('${p.id}')">Déployer</button><button class="danger" onclick="delPackage('${p.id}','${esc(p.name)}')">✕</button></td>
     </tr>`).join(""):'<tr><td colspan="6" class="muted">Aucun logiciel. Téléverse un installeur ci-dessus.</td></tr>';
   }catch(e){toast(e.message,true);}
 }
@@ -308,9 +439,9 @@ function renderMachines(){
     <td><span class="dot ${m.online?'on':'off'}"></span>${m.online?'en ligne':'hors ligne'} ${m.remoteSessionActive?'<span class="tag rdp">RDP</span>':''}</td>
     <td><a onclick="openMachine('${m.id}')">${esc(m.name)}</a></td>
     <td>${OS[m.os]||'?'}</td><td>${esc(m.currentUser||'—')}</td>
-    <td><select onchange="assignBureau('${m.id}',this.value)">${opts.replace('value="'+(m.bureauId||'')+'"','value="'+(m.bureauId||'')+'" selected')}</select></td>
+    <td><select ${State.me&&State.me.isAdmin?'':'disabled'} onchange="assignBureau('${m.id}',this.value)">${opts.replace('value="'+(m.bureauId||'')+'"','value="'+(m.bureauId||'')+'" selected')}</select></td>
     <td class="muted">${ago(m.lastSeenAt)}</td>
-    <td class="row">
+    <td class="row adm">
       <button class="sec" onclick="cmd('${m.id}',${CMD.Lock})">Verrouiller</button>
       <button class="sec" onclick="cmd('${m.id}',${CMD.Reboot})">Redémarrer</button>
       <button class="sec" onclick="msgCmd('${m.id}')">Message</button>
@@ -326,6 +457,7 @@ async function delMachine(id,name){if(!confirm(`Supprimer « ${name} » et son a
 async function openMachine(id){
   try{
     const m=await api("/api/admin/machines/"+id);
+    $("modalTitle").textContent="Détail du poste";
     const today=new Date().toLocaleDateString('en-CA');
     let act={apps:[]},hist=[],soft=[];
     try{act=await api(`/api/admin/machines/${id}/activity?day=${today}`);}catch(_){}
@@ -338,7 +470,7 @@ async function openMachine(id){
     const histRows=hist.length?hist.map(c=>`<tr><td>${CMDNAME[c.type]||c.type}</td><td class="muted">${new Date(c.createdAt).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td><td>${c.deliveredAt?'<span class="dot on"></span>livrée':'<span class="dot off"></span>en file'}</td><td>${res(c)}</td><td class="muted">${esc(c.preview||'')}</td></tr>`).join(""):'<tr><td colspan="5" class="muted">Aucune commande.</td></tr>';
     const softRows=soft.length?soft.map(s=>`<tr><td>${esc(s.name)}</td><td class="muted">${esc(s.version||'')}</td></tr>`).join(""):'<tr><td colspan="2" class="muted">Pas encore d\'inventaire.</td></tr>';
     $("modalBody").innerHTML=`
-      <div class="row" style="margin-bottom:12px"><input id="mName" value="${esc(m.name)}" style="flex:1"><button onclick="renameMachine('${m.id}')">Renommer</button><button class="sec" onclick="wake('${m.id}')">Réveiller (WoL)</button></div>
+      <div class="row adm" style="margin-bottom:12px"><input id="mName" value="${esc(m.name)}" style="flex:1"><button onclick="renameMachine('${m.id}')">Renommer</button><button class="sec" onclick="wake('${m.id}')">Réveiller (WoL)</button></div>
       ${kv('État',(m.online?'<span class="dot on"></span>en ligne':'<span class="dot off"></span>hors ligne')+(m.remoteSessionActive?' <span class="tag rdp">RDP</span>':''))}
       ${kv('Hôte',esc(m.hostname||'—'))}
       ${kv('OS',(OS[m.os]||'?')+' '+esc(m.osVersion||''))}
@@ -365,7 +497,7 @@ async function wake(id){try{await api("/api/admin/machines/"+id+"/wake",{method:
 
 /* BUREAUS */
 function renderBureaus(){const b=$("bureausBody");if(!State.bureaus.length){b.innerHTML='<tr><td colspan="5" class="muted">Aucun bureau.</td></tr>';return;}
-  b.innerHTML=State.bureaus.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.location||'—')}</td><td class="muted">${esc(x.description||'')}</td><td>${x.machineCount}</td><td><button class="danger" onclick="delBureau('${x.id}','${esc(x.name)}')">✕</button></td></tr>`).join("");}
+  b.innerHTML=State.bureaus.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.location||'—')}</td><td class="muted">${esc(x.description||'')}</td><td>${x.machineCount}</td><td class="adm"><button class="danger" onclick="delBureau('${x.id}','${esc(x.name)}')">✕</button></td></tr>`).join("");}
 function fillBureauSelect(){$("cdBureau").innerHTML='<option value="">— Sans bureau —</option>'+State.bureaus.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("");}
 async function createBureau(){const name=$("buName").value.trim();if(!name)return toast("Nom requis.",true);try{await api("/api/admin/bureaus",{method:"POST",body:JSON.stringify({name,location:$("buLoc").value.trim()||null,description:$("buDesc").value.trim()||null})});$("buName").value=$("buLoc").value=$("buDesc").value="";toast("Créé.");refresh();}catch(e){toast(e.message,true);}}
 async function delBureau(id,name){if(!confirm(`Supprimer le bureau « ${name} » ? Les postes seront détachés.`))return;try{await api("/api/admin/bureaus/"+id,{method:"DELETE"});toast("Supprimé.");refresh();}catch(e){toast(e.message,true);}}
@@ -378,17 +510,17 @@ async function loadActivity(){const id=$("actMachine").value,day=$("actDay").val
 /* RECAP */
 function initRecap(){const t=new Date().toLocaleDateString('en-CA');if(!$("teDate").value)$("teDate").value=t;if(!$("teFrom").value)$("teFrom").value=t;if(!$("teTo").value)$("teTo").value=t;loadRecap();}
 async function addEntry(){const d=$("teDate").value,s=$("teStart").value,e=$("teEnd").value;if(!$("teProject").value.trim()||!d||!s||!e)return toast("Projet, date, début et fin requis.",true);let ed=d;if(new Date(d+"T"+e)<new Date(d+"T"+s)){const nd=new Date(d);nd.setDate(nd.getDate()+1);ed=nd.toLocaleDateString('en-CA');}try{await api("/api/admin/time-entries",{method:"POST",body:JSON.stringify({project:$("teProject").value.trim(),start:new Date(d+"T"+s).toISOString(),end:new Date(ed+"T"+e).toISOString(),note:$("teNote").value.trim()||null,source:"manuel"})});$("teNote").value="";toast("Ajouté.");loadRecap();}catch(err){toast(err.message,true);}}
-async function loadRecap(){const f=$("teFrom").value,t=$("teTo").value,qs=[];if(f)qs.push("from="+f+"T00:00:00");if(t)qs.push("to="+t+"T23:59:59");const body=$("recapBody");try{const r=await api("/api/admin/time-entries"+(qs.length?"?"+qs.join("&"):""));$("teTotal").textContent="Total : "+durM(r.totalMinutes);const tm=x=>new Date(x).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});body.innerHTML=r.entries.length?r.entries.map(e=>`<tr><td>${esc(e.project)}</td><td class="muted">${tm(e.start)}</td><td class="muted">${tm(e.end)}</td><td>${durM(e.minutes)}</td><td><span class="tag">${esc(e.source)}</span></td><td class="muted">${esc(e.note||'')}</td><td><button class="danger" onclick="delEntry('${e.id}')">✕</button></td></tr>`).join(""):'<tr><td colspan="7" class="muted">Aucune entrée.</td></tr>';}catch(e){toast(e.message,true);}}
+async function loadRecap(){const f=$("teFrom").value,t=$("teTo").value,qs=[];if(f)qs.push("from="+f+"T00:00:00");if(t)qs.push("to="+t+"T23:59:59");const body=$("recapBody");try{const r=await api("/api/admin/time-entries"+(qs.length?"?"+qs.join("&"):""));$("teTotal").textContent="Total : "+durM(r.totalMinutes);const tm=x=>new Date(x).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});body.innerHTML=r.entries.length?r.entries.map(e=>`<tr><td>${esc(e.project)}</td><td class="muted">${tm(e.start)}</td><td class="muted">${tm(e.end)}</td><td>${durM(e.minutes)}</td><td><span class="tag">${esc(e.source)}</span></td><td class="muted">${esc(e.note||'')}</td><td class="adm"><button class="danger" onclick="delEntry('${e.id}')">✕</button></td></tr>`).join(""):'<tr><td colspan="7" class="muted">Aucune entrée.</td></tr>';}catch(e){toast(e.message,true);}}
 function openTicket(){const day=$("teFrom").value||new Date().toLocaleDateString('en-CA');window.open("/recap.html?day="+day,"_blank");}
 async function delEntry(id){try{await api("/api/admin/time-entries/"+id,{method:"DELETE"});toast("Supprimée.");loadRecap();}catch(e){toast(e.message,true);}}
 
 /* CODES */
 async function createCode(){try{const r=await api("/api/admin/enrollment-codes",{method:"POST",body:JSON.stringify({label:$("cdLabel").value.trim()||null,maxUses:parseInt($("cdUses").value)||1,expiresInHours:parseInt($("cdHours").value)||0,bureauId:$("cdBureau").value||null})});const o=$("codeOut");o.classList.remove("hide");o.innerHTML=`Code : <code style="font-size:16px">${esc(r.code)}</code> — ${r.remainingUses} utilisation(s)`+(r.expiresAt?`, expire le ${new Date(r.expiresAt).toLocaleString('fr-FR')}`:", sans expiration");toast("Généré.");loadCodes();}catch(e){toast(e.message,true);}}
-async function loadCodes(){const body=$("codesBody");try{const codes=await api("/api/admin/enrollment-codes");const bn=id=>{const b=State.bureaus.find(x=>x.id===id);return b?esc(b.name):'—';};body.innerHTML=codes.length?codes.map(c=>`<tr><td><code>${esc(c.code)}</code></td><td>${esc(c.label||'—')}</td><td>${bn(c.bureauId)}</td><td>${c.remainingUses}</td><td class="muted">${c.expiresAt?new Date(c.expiresAt).toLocaleString('fr-FR'):'jamais'}</td><td>${c.usable?'<span class="dot on"></span>actif':(c.isRevoked?'révoqué':'épuisé')}</td><td>${c.usable?`<button class="danger" onclick="revokeCode('${c.id}')">Révoquer</button>`:''}</td></tr>`).join(""):'<tr><td colspan="7" class="muted">Aucun code.</td></tr>';}catch(e){toast(e.message,true);}}
+async function loadCodes(){const body=$("codesBody");try{const codes=await api("/api/admin/enrollment-codes");const bn=id=>{const b=State.bureaus.find(x=>x.id===id);return b?esc(b.name):'—';};body.innerHTML=codes.length?codes.map(c=>`<tr><td><code>${esc(c.code)}</code></td><td>${esc(c.label||'—')}</td><td>${bn(c.bureauId)}</td><td>${c.remainingUses}</td><td class="muted">${c.expiresAt?new Date(c.expiresAt).toLocaleString('fr-FR'):'jamais'}</td><td>${c.usable?'<span class="dot on"></span>actif':(c.isRevoked?'révoqué':'épuisé')}</td><td class="adm">${c.usable?`<button class="danger" onclick="revokeCode('${c.id}')">Révoquer</button>`:''}</td></tr>`).join(""):'<tr><td colspan="7" class="muted">Aucun code.</td></tr>';}catch(e){toast(e.message,true);}}
 async function revokeCode(id){try{await api("/api/admin/enrollment-codes/"+id+"/revoke",{method:"POST"});toast("Révoqué.");loadCodes();}catch(e){toast(e.message,true);}}
 
-setInterval(()=>{if(State.key&&!$("shell").classList.contains("hide"))refresh();},20000);
-window.addEventListener("load",()=>{const k=sessionStorage.getItem("remina_key");if(k){$("keyInput").value=k;login();}});
+setInterval(()=>{if(State.me&&!$("shell").classList.contains("hide"))refresh();},20000);
+window.addEventListener("load",()=>{try{sessionStorage.removeItem("remina_key");}catch(_){}boot();});
 </script>
 </body>
 </html>

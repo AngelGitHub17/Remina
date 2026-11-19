@@ -14,6 +14,9 @@ public class ReminaDbContext : DbContext
     public DbSet<ManualTimeEntry> TimeEntries => Set<ManualTimeEntry>();
     public DbSet<Package> Packages => Set<Package>();
     public DbSet<InventoryItem> Inventory => Set<InventoryItem>();
+    public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
+    public DbSet<AdminSession> AdminSessions => Set<AdminSession>();
+    public DbSet<ServerSetting> ServerSettings => Set<ServerSetting>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -40,6 +43,22 @@ public class ReminaDbContext : DbContext
         b.Entity<EnrollmentCode>(e =>
         {
             e.HasIndex(c => c.Code).IsUnique();
+        });
+
+        b.Entity<AdminUser>(e =>
+        {
+            e.HasIndex(u => u.Username).IsUnique();
+        });
+
+        b.Entity<AdminSession>(e =>
+        {
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => x.UserId);
+        });
+
+        b.Entity<ServerSetting>(e =>
+        {
+            e.HasKey(x => x.Key);
         });
 
         b.Entity<ActivityAggregate>(e =>

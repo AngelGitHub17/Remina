@@ -27,9 +27,8 @@
 
 <div id="gate" class="gate">
   <h1>Ticket récapitulatif</h1>
-  <p class="muted">Clé d'administration :</p>
-  <input id="key" type="password" style="width:100%" placeholder="X-Admin-Key">
-  <button style="margin-top:10px;width:100%" onclick="enter()">Entrer</button>
+  <p class="muted">Connecte-toi d'abord à la console.</p>
+  <button style="margin-top:10px;width:100%" onclick="location.href='/?next='+encodeURIComponent(location.pathname+location.search)">Se connecter</button>
 </div>
 
 <div id="app" style="display:none">
@@ -43,16 +42,16 @@
 </div>
 
 <script>
-let KEY="";
 const $=id=>document.getElementById(id);
-function enter(){ KEY=$("key").value.trim(); if(!KEY) return;
-  api("/api/admin/recap").then(()=>{ sessionStorage.setItem("rk",KEY);
-    $("gate").style.display="none"; $("app").style.display="block";
+async function api(p){ const r=await fetch(p,{credentials:"same-origin"}); if(!r.ok){ const e=new Error("HTTP "+r.status); e.status=r.status; throw e; } return r.json(); }
+async function boot(){
+  try{
     const u=new URLSearchParams(location.search);
-    $("day").value=u.get("day")||new Date().toLocaleDateString('en-CA'); load();
-  }).catch(()=>alert("Clé refusée."));
+    $("day").value=u.get("day")||new Date().toLocaleDateString('en-CA');
+    await load();
+    $("gate").style.display="none"; $("app").style.display="block";
+  }catch(e){ $("gate").style.display="block"; $("app").style.display="none"; }
 }
-async function api(p){ const r=await fetch(p,{headers:{"X-Admin-Key":KEY}}); if(!r.ok) throw 0; return r.json(); }
 function dur(s){ const h=Math.floor(s/3600),m=Math.round((s%3600)/60); return (h>0?h+" h ":"")+(m<10&&h>0?"0":"")+m+" min"; }
 function durM(m){ const h=Math.floor(m/60); return (h>0?h+" h ":"")+(m%60<10&&h>0?"0":"")+(m%60)+" min"; }
 function t(x){ return new Date(x).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }
@@ -84,7 +83,7 @@ async function load(){
   html+=`<div class="foot">Remina — généré le ${new Date().toLocaleString('fr-FR')}</div>`;
   $("sheet").innerHTML=html;
 }
-window.addEventListener("load",()=>{ const k=sessionStorage.getItem("rk"); if(k){ $("key").value=k; enter(); } });
+window.addEventListener("load",()=>{ try{sessionStorage.removeItem("rk");}catch(_){} boot(); });
 </script>
 </body>
 </html>
