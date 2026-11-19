@@ -12,7 +12,7 @@ public static class AgentEndpoints
         var g = app.MapGroup("/api/agent");
 
         // Inscription d'un poste : l'agent présente un code d'inscription valide.
-        g.MapPost("/enroll", async (EnrollRequest req, ReminaDbContext db) =>
+        g.MapPost("/enroll", async (EnrollRequest req, HttpContext http, ReminaDbContext db, Remina.Server.Services.AuditService audit) =>
         {
             if (string.IsNullOrWhiteSpace(req.EnrollmentCode) ||
                 string.IsNullOrWhiteSpace(req.HardwareId))
@@ -23,8 +23,12 @@ public static class AgentEndpoints
                 .FirstOrDefaultAsync(c => c.Code == req.EnrollmentCode);
 
             if (code is null || !code.IsUsable(now))
+            {
+                await audit.LogAsync(http, "agent.enroll", success: false, username: "agent",
+                    details: $"code refusé · {req.Inventory.Hostname}", statusCode: 403);
                 return Results.Json(new { error = "Code d'inscription invalide ou expiré." },
                     statusCode: StatusCodes.Status403Forbidden);
+            }
 
             // Réinscription du même matériel : on réémet un jeton au lieu de dupliquer.
             var machine = await db.Machines
@@ -55,6 +59,9 @@ public static class AgentEndpoints
             code.RemainingUses--;
 
             await db.SaveChangesAsync();
+
+            await audit.LogAsync(http, "agent.enroll", username: "agent", targetType: "machines",
+                targetId: machine.Id.ToString(), details: $"{machine.Name} · code « {code.Label ?? "sans libellé"} »");
 
             var bureauName = machine.BureauId is null
                 ? null

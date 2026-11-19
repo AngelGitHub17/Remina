@@ -192,3 +192,41 @@ public class ServerSetting
     public string Key { get; set; } = "";
     public string Value { get; set; } = "";
 }
+
+/// <summary>
+/// Entrée du journal d'audit (qui / quoi / quand). <see cref="AtUnixMs"/> double la date en
+/// entier : SQLite ne sait ni trier ni comparer les DateTimeOffset côté SQL, et le journal est
+/// trop gros pour être chargé entièrement en mémoire.
+/// </summary>
+public class AuditEntry
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public DateTimeOffset At { get; set; } = DateTimeOffset.UtcNow;
+    public long AtUnixMs { get; set; }
+    public Guid? UserId { get; set; }
+    public string Username { get; set; } = "";
+    /// <summary>Code d'action, ex. « auth.login », « POST /api/admin/machines/{id}/commands ».</summary>
+    public string Action { get; set; } = "";
+    public string? TargetType { get; set; }
+    public string? TargetId { get; set; }
+    /// <summary>Détail court (corps JSON expurgé des secrets, tronqué).</summary>
+    public string? Details { get; set; }
+    public string? Ip { get; set; }
+    public bool Success { get; set; } = true;
+    public int? StatusCode { get; set; }
+}
+
+/// <summary>Jeton d'API personnel (scripts), au rôle de son compte. Seul le hachage est stocké.</summary>
+public class ApiToken
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid UserId { get; set; }
+    public string Name { get; set; } = "";
+    public string TokenHash { get; set; } = "";
+    /// <summary>Début du jeton (affichage, pour le reconnaître).</summary>
+    public string Prefix { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? LastUsedAt { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+}

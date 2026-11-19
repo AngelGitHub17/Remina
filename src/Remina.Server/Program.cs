@@ -36,6 +36,8 @@ builder.Services.AddHostedService<Remina.Server.Services.RecapScheduler>();
 
 // Comptes de console : service d'authentification (sessions cookie + clé historique).
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AuditService>();
+builder.Services.AddHostedService<AuditPurger>();
 
 // Derrière un reverse proxy (Nginx, NPM) : on ne fait confiance aux en-têtes X-Forwarded-*
 // que s'ils viennent d'un proxy déclaré (Remina:TrustedProxies, IP ou CIDR ; boucle locale

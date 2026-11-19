@@ -7,7 +7,8 @@ using Remina.Server.Data;
 namespace Remina.Server.Services;
 
 /// <summary>Identité authentifiée d'une requête de console.</summary>
-/// <param name="Method">« session » (cookie) ou « legacy-key » (en-tête X-Admin-Key).</param>
+/// <param name="Method">« session » (cookie), « api-token » (Authorization: Bearer rmn_…)
+/// ou « legacy-key » (en-tête X-Admin-Key).</param>
 public sealed record AdminPrincipal(
     Guid? UserId, string Username, string DisplayName, AdminRole Role, string Method, Guid? SessionId)
 {
@@ -25,6 +26,8 @@ public sealed class AuthService
     public const string SettingLegacyKey = "LegacyKeyEnabled";
     /// <summary>Valeur d'exemple livrée dans appsettings.json : refusée hors connexion locale.</summary>
     public const string DefaultKey = "change-me-admin-key";
+    /// <summary>Préfixe des jetons d'API personnels (reconnaissables dans un script ou un scan de secrets).</summary>
+    public const string ApiTokenPrefix = "rmn_";
     private const string ItemKey = "remina.principal";
 
     private readonly ReminaDbContext _db;
@@ -105,6 +108,10 @@ public sealed class AuthService
             if (p is not null) return p;
         }
 
+        var auth = http.Request.Headers.Authorization.ToString();
+        if (auth.StartsWith("Bearer " + ApiTokenPrefix, StringComparison.Ordinal))
+            return await FromApiTokenAsync(auth["Bearer ".Length..].Trim());
+
         var key = http.Request.Headers[LegacyHeader].ToString();
         if (!string.IsNullOrEmpty(key) && await LegacyKeyEnabledAsync() && LegacyKeyMatches(key, http))
             return new AdminPrincipal(null, "clé-historique", "Clé d'administration", AdminRole.Admin, "legacy-key", null);
@@ -132,6 +139,39 @@ public sealed class AuthService
             await _db.SaveChangesAsync();
         }
         return new AdminPrincipal(u.Id, u.Username, u.DisplayName, u.Role, "session", s.Id);
+    }
+
+    private async Task<AdminPrincipal?> FromApiTokenAsync(string token)
+    {
+        var hash = TokenService.Hash(token);
+        var t = await _db.ApiTokens.FirstOrDefaultAsync(x => x.TokenHash == hash);
+        var now = DateTimeOffset.UtcNow;
+        if (t is null || t.RevokedAt is not null || (t.ExpiresAt is { } exp && exp <= now)) return null;
+        var u = await _db.AdminUsers.FirstOrDefaultAsync(x => x.Id == t.UserId);
+        if (u is null || u.IsDisabled) return null;
+        if (t.LastUsedAt is null || now - t.LastUsedAt > TimeSpan.FromMinutes(5))
+        {
+            t.LastUsedAt = now;
+            await _db.SaveChangesAsync();
+        }
+        return new AdminPrincipal(u.Id, u.Username, u.DisplayName, u.Role, "api-token", null);
+    }
+
+    /// <summary>Crée un jeton d'API ; renvoie la valeur en clair (affichée une seule fois).</summary>
+    public async Task<(ApiToken Token, string Raw)> CreateApiTokenAsync(Guid userId, string name, int? days)
+    {
+        var raw = ApiTokenPrefix + TokenService.NewAgentToken();
+        var t = new ApiToken
+        {
+            UserId = userId,
+            Name = name,
+            TokenHash = TokenService.Hash(raw),
+            Prefix = raw[..12],
+            ExpiresAt = days is > 0 ? DateTimeOffset.UtcNow.AddDays(days.Value) : null,
+        };
+        _db.ApiTokens.Add(t);
+        await _db.SaveChangesAsync();
+        return (t, raw);
     }
 
     // --- Sessions -------------------------------------------------------------------------

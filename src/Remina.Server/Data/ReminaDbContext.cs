@@ -17,6 +17,8 @@ public class ReminaDbContext : DbContext
     public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
     public DbSet<AdminSession> AdminSessions => Set<AdminSession>();
     public DbSet<ServerSetting> ServerSettings => Set<ServerSetting>();
+    public DbSet<AuditEntry> AuditLog => Set<AuditEntry>();
+    public DbSet<ApiToken> ApiTokens => Set<ApiToken>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -51,6 +53,19 @@ public class ReminaDbContext : DbContext
         });
 
         b.Entity<AdminSession>(e =>
+        {
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => x.UserId);
+        });
+
+        b.Entity<AuditEntry>(e =>
+        {
+            e.ToTable("AuditLog");
+            e.HasIndex(x => x.AtUnixMs);
+            e.HasIndex(x => x.UserId);
+        });
+
+        b.Entity<ApiToken>(e =>
         {
             e.HasIndex(x => x.TokenHash).IsUnique();
             e.HasIndex(x => x.UserId);

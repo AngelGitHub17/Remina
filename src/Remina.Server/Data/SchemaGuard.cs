@@ -88,6 +88,36 @@ public static class SchemaGuard
             @"CREATE TABLE IF NOT EXISTS ""ServerSettings"" (
                 ""Key"" TEXT NOT NULL CONSTRAINT ""PK_ServerSettings"" PRIMARY KEY,
                 ""Value"" TEXT NOT NULL);",
+
+            // v0.2.1 — journal d'audit, jetons d'API.
+            @"CREATE TABLE IF NOT EXISTS ""AuditLog"" (
+                ""Id"" TEXT NOT NULL CONSTRAINT ""PK_AuditLog"" PRIMARY KEY,
+                ""At"" TEXT NOT NULL,
+                ""AtUnixMs"" INTEGER NOT NULL,
+                ""UserId"" TEXT NULL,
+                ""Username"" TEXT NOT NULL,
+                ""Action"" TEXT NOT NULL,
+                ""TargetType"" TEXT NULL,
+                ""TargetId"" TEXT NULL,
+                ""Details"" TEXT NULL,
+                ""Ip"" TEXT NULL,
+                ""Success"" INTEGER NOT NULL,
+                ""StatusCode"" INTEGER NULL);",
+            @"CREATE INDEX IF NOT EXISTS ""IX_AuditLog_AtUnixMs"" ON ""AuditLog"" (""AtUnixMs"");",
+            @"CREATE INDEX IF NOT EXISTS ""IX_AuditLog_UserId"" ON ""AuditLog"" (""UserId"");",
+
+            @"CREATE TABLE IF NOT EXISTS ""ApiTokens"" (
+                ""Id"" TEXT NOT NULL CONSTRAINT ""PK_ApiTokens"" PRIMARY KEY,
+                ""UserId"" TEXT NOT NULL,
+                ""Name"" TEXT NOT NULL,
+                ""TokenHash"" TEXT NOT NULL,
+                ""Prefix"" TEXT NOT NULL,
+                ""CreatedAt"" TEXT NOT NULL,
+                ""LastUsedAt"" TEXT NULL,
+                ""ExpiresAt"" TEXT NULL,
+                ""RevokedAt"" TEXT NULL);",
+            @"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_ApiTokens_TokenHash"" ON ""ApiTokens"" (""TokenHash"");",
+            @"CREATE INDEX IF NOT EXISTS ""IX_ApiTokens_UserId"" ON ""ApiTokens"" (""UserId"");",
         };
 
         foreach (var s in sql)

@@ -132,6 +132,10 @@ toute seule toutes les 20 s.
   qu'elle n'est pas désactivée dans **Comptes → Clé d'administration historique** (ou
   forcée hors service avec `Admin__LegacyKeyEnabled=false`). La clé d'exemple
   `change-me-admin-key` n'est acceptée que depuis le serveur lui-même.
+- **Scripts** : crée un **jeton d'API** dans *Mon compte* et utilise
+  `-H "Authorization: Bearer rmn_…"` à la place de `X-Admin-Key` (droits du compte, révocable).
+- **Journal d'audit** (section *Journal*, admin) : connexions, toutes les actions, refus ;
+  purge après `Remina__Audit__RetentionDays` jours (365 par défaut).
 - **Accès perdu** : sur le serveur, depuis le dossier d'installation :
   `sudo -u remina ./Remina.Server --reset-admin <identifiant>` (Proxmox : `cd /opt/remina/server`)
   → affiche un mot de passe temporaire.
@@ -208,6 +212,8 @@ un heartbeat toutes les 30 s. Le poste apparaît dans `GET /api/admin/machines`.
 | POST | `/api/auth/me/password` | session | Changer son mot de passe |
 | GET/POST/PUT/DELETE | `/api/admin/users[/{id}]` | admin | Gestion des comptes |
 | GET/PUT | `/api/admin/settings` | admin | Clé historique on/off |
+| GET/POST/DELETE | `/api/auth/me/tokens[/{id}]` | session | Jetons d'API personnels |
+| GET | `/api/admin/audit` | admin | Journal d'audit (`user`, `action`, `from`, `to`, `failedOnly`, `before`, `limit`) |
 | POST | `/api/admin/enrollment-codes` | admin | Créer un code d'inscription (option `bureauId`) |
 | GET | `/api/admin/machines` | admin | Lister les postes (avec leur bureau) |
 | POST | `/api/admin/machines/{id}/commands` | admin | Mettre un ordre en file |

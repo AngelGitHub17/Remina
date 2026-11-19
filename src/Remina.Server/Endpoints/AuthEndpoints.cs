@@ -32,14 +32,17 @@ public static class AuthEndpoints
         });
 
         // Création du premier compte admin : preuve = clé d'administration de la configuration.
-        a.MapPost("/bootstrap", async (BootstrapDto dto, HttpContext http, AuthService auth, ReminaDbContext db) =>
+        a.MapPost("/bootstrap", async (BootstrapDto dto, HttpContext http, AuthService auth, AuditService audit, ReminaDbContext db) =>
         {
             if (await auth.AnyUserAsync())
                 return Results.Conflict(new { error = "Un compte existe déjà : connecte-toi." });
             if (!auth.LegacyKeyConfigured)
                 return Results.BadRequest(new { error = "Aucune clé Admin:ApiKey configurée sur le serveur. Utilise --reset-admin <identifiant> en ligne de commande." });
             if (!auth.LegacyKeyMatches(dto.AdminKey, http))
+            {
+                await audit.LogAsync(http, "auth.bootstrap", success: false, username: Clip(dto.Username), statusCode: 403);
                 return Results.Json(new { error = "Clé d'administration refusée." }, statusCode: StatusCodes.Status403Forbidden);
+            }
 
             var username = AuthService.NormalizeUsername(dto.Username);
             var err = AuthService.ValidateUsername(username) ?? PasswordHasher.Validate(dto.Password);
@@ -55,10 +58,11 @@ public static class AuthEndpoints
             db.AdminUsers.Add(user);
             await db.SaveChangesAsync();
             await auth.CreateSessionAsync(user, http);
+            await audit.LogAsync(http, "auth.bootstrap", who: Principal(user), targetType: "users", targetId: user.Id.ToString());
             return Results.Ok(new { user = UserDto(user) });
         }).RequireRateLimiting(LoginRateLimit);
 
-        a.MapPost("/login", async (LoginDto dto, HttpContext http, AuthService auth, ReminaDbContext db) =>
+        a.MapPost("/login", async (LoginDto dto, HttpContext http, AuthService auth, AuditService audit, ReminaDbContext db) =>
         {
             var username = AuthService.NormalizeUsername(dto.Username);
             var user = await db.AdminUsers.FirstOrDefaultAsync(u => u.Username == username);
@@ -68,11 +72,15 @@ public static class AuthEndpoints
             if (user is null)
             {
                 PasswordHasher.Verify(dto.Password ?? "", null); // temps de réponse homogène
+                await audit.LogAsync(http, "auth.login", success: false, username: Clip(username), details: "identifiant inconnu", statusCode: 401);
                 return Results.Json(new { error = generic }, statusCode: StatusCodes.Status401Unauthorized);
             }
             if (user.LockoutUntil is { } until && until > now)
+            {
+                await audit.LogAsync(http, "auth.login", success: false, who: Principal(user), details: "compte verrouillé", statusCode: 423);
                 return Results.Json(new { error = $"Compte verrouillé après trop d'échecs. Réessaie après {until.ToLocalTime():HH:mm}." },
                     statusCode: StatusCodes.Status423Locked);
+            }
 
             if (!PasswordHasher.Verify(dto.Password ?? "", user.PasswordHash))
             {
@@ -83,20 +91,28 @@ public static class AuthEndpoints
                     user.FailedLogins = 0;
                 }
                 await db.SaveChangesAsync();
+                await audit.LogAsync(http, "auth.login", success: false, who: Principal(user),
+                    details: user.LockoutUntil is not null ? "mot de passe incorrect — compte verrouillé" : "mot de passe incorrect", statusCode: 401);
                 return Results.Json(new { error = generic }, statusCode: StatusCodes.Status401Unauthorized);
             }
             if (user.IsDisabled)
+            {
+                await audit.LogAsync(http, "auth.login", success: false, who: Principal(user), details: "compte désactivé", statusCode: 403);
                 return Results.Json(new { error = "Compte désactivé." }, statusCode: StatusCodes.Status403Forbidden);
+            }
 
             if (PasswordHasher.NeedsRehash(user.PasswordHash!))
                 user.PasswordHash = PasswordHasher.Hash(dto.Password!);
             await auth.CreateSessionAsync(user, http);
+            await audit.LogAsync(http, "auth.login", who: Principal(user));
             return Results.Ok(new { user = UserDto(user) });
         }).RequireRateLimiting(LoginRateLimit);
 
-        a.MapPost("/logout", async (HttpContext http, AuthService auth) =>
+        a.MapPost("/logout", async (HttpContext http, AuthService auth, AuditService audit) =>
         {
+            var me = await auth.AuthenticateAsync(http);
             await auth.RevokeCurrentAsync(http);
+            if (me is not null) await audit.LogAsync(http, "auth.logout", who: me);
             return Results.Ok();
         });
 
@@ -107,20 +123,84 @@ public static class AuthEndpoints
         });
 
         // Changement de son propre mot de passe : les autres sessions sont révoquées.
-        a.MapPost("/me/password", async (ChangePasswordDto dto, HttpContext http, AuthService auth, ReminaDbContext db) =>
+        a.MapPost("/me/password", async (ChangePasswordDto dto, HttpContext http, AuthService auth, AuditService audit, ReminaDbContext db) =>
         {
             var me = await auth.AuthenticateAsync(http);
-            if (me?.UserId is null) return Results.Unauthorized();
+            if (me?.UserId is null || me.Method != "session") return Results.Unauthorized();
             var user = await db.AdminUsers.FirstAsync(u => u.Id == me.UserId);
             if (user.PasswordHash is not null && !PasswordHasher.Verify(dto.CurrentPassword ?? "", user.PasswordHash))
+            {
+                await audit.LogAsync(http, "auth.password.change", success: false, who: me, statusCode: 400);
                 return Results.BadRequest(new { error = "Mot de passe actuel incorrect." });
+            }
             var err = PasswordHasher.Validate(dto.NewPassword);
             if (err is not null) return Results.BadRequest(new { error = err });
             user.PasswordHash = PasswordHasher.Hash(dto.NewPassword!);
             await db.SaveChangesAsync();
             await auth.RevokeAllAsync(user.Id, except: me.SessionId);
+            await audit.LogAsync(http, "auth.password.change", who: me);
             return Results.Ok();
         }).RequireRateLimiting(LoginRateLimit);
+
+        // --- Jetons d'API personnels (scripts) : gérés depuis une session uniquement -----------
+        a.MapGet("/me/tokens", async (HttpContext http, AuthService auth, ReminaDbContext db) =>
+        {
+            var me = await auth.AuthenticateAsync(http);
+            if (me?.UserId is null || me.Method != "session") return Results.Unauthorized();
+            var list = (await db.ApiTokens.Where(t => t.UserId == me.UserId && t.RevokedAt == null).ToListAsync())
+                .OrderByDescending(t => t.CreatedAt)
+                .Select(t => new { t.Id, t.Name, t.Prefix, t.CreatedAt, t.LastUsedAt, t.ExpiresAt,
+                    Expired = t.ExpiresAt is { } e && e <= DateTimeOffset.UtcNow });
+            return Results.Ok(list);
+        });
+
+        a.MapPost("/me/tokens", async (CreateTokenDto dto, HttpContext http, AuthService auth, AuditService audit) =>
+        {
+            var me = await auth.AuthenticateAsync(http);
+            if (me?.UserId is null || me.Method != "session") return Results.Unauthorized();
+            var name = (dto.Name ?? "").Trim();
+            if (name.Length is < 1 or > 60) return Results.BadRequest(new { error = "Nom du jeton : 1 à 60 caractères." });
+            if (dto.ExpiresInDays is < 0 or > 3650) return Results.BadRequest(new { error = "Durée invalide." });
+            var (t, raw) = await auth.CreateApiTokenAsync(me.UserId.Value, name, dto.ExpiresInDays);
+            await audit.LogAsync(http, "token.create", who: me, targetType: "tokens", targetId: t.Id.ToString(), details: name);
+            return Results.Ok(new { t.Id, t.Name, t.Prefix, t.ExpiresAt, token = raw });
+        });
+
+        a.MapDelete("/me/tokens/{id:guid}", async (Guid id, HttpContext http, AuthService auth, AuditService audit, ReminaDbContext db) =>
+        {
+            var me = await auth.AuthenticateAsync(http);
+            if (me?.UserId is null || me.Method != "session") return Results.Unauthorized();
+            var t = await db.ApiTokens.FirstOrDefaultAsync(x => x.Id == id && x.UserId == me.UserId);
+            if (t is null) return Results.NotFound();
+            t.RevokedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+            await audit.LogAsync(http, "token.revoke", who: me, targetType: "tokens", targetId: id.ToString(), details: t.Name);
+            return Results.Ok();
+        });
+
+        // --- Journal d'audit (admin) : filtres + pagination par curseur (before = AtUnixMs) ---
+        app.MapGet("/api/admin/audit", async (ReminaDbContext db, string? user, string? action,
+            string? from, string? to, bool? failedOnly, long? before, int? limit) =>
+        {
+            var q = db.AuditLog.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(user)) q = q.Where(e => e.Username.Contains(user.Trim().ToLower()));
+            if (!string.IsNullOrWhiteSpace(action)) q = q.Where(e => e.Action.Contains(action.Trim()));
+            if (failedOnly == true) q = q.Where(e => !e.Success);
+            if (DateTimeOffset.TryParse(from, out var f)) { var ms = f.ToUnixTimeMilliseconds(); q = q.Where(e => e.AtUnixMs >= ms); }
+            if (DateTimeOffset.TryParse(to, out var t)) { var ms = t.ToUnixTimeMilliseconds(); q = q.Where(e => e.AtUnixMs <= ms); }
+            if (before is { } b) q = q.Where(e => e.AtUnixMs < b);
+            var n = Math.Clamp(limit ?? 100, 1, 500);
+            // Tri sur l'entier AtUnixMs : traduisible en SQL (contrairement à DateTimeOffset).
+            var rows = await q.OrderByDescending(e => e.AtUnixMs).Take(n + 1).ToListAsync();
+            var more = rows.Count > n;
+            var page = rows.Take(n).ToList();
+            return Results.Ok(new
+            {
+                entries = page.Select(e => new { e.Id, e.At, e.Username, e.Action, e.TargetType, e.TargetId,
+                    e.Details, e.Ip, e.Success, e.StatusCode }),
+                next = more ? page[^1].AtUnixMs : (long?)null,
+            });
+        });
 
         // --- Comptes (admin) -----------------------------------------------------------------
         var u = app.MapGroup("/api/admin/users");
@@ -216,6 +296,7 @@ public static class AuthEndpoints
             if (await IsLastActiveAdminAsync(db, user))
                 return Results.BadRequest(new { error = "Il doit rester au moins un compte admin actif." });
             db.AdminSessions.RemoveRange(await db.AdminSessions.Where(s => s.UserId == id).ToListAsync());
+            db.ApiTokens.RemoveRange(await db.ApiTokens.Where(t => t.UserId == id).ToListAsync());
             db.AdminUsers.Remove(user);
             await db.SaveChangesAsync();
             return Results.Ok();
@@ -280,6 +361,11 @@ public static class AuthEndpoints
         var now = DateTimeOffset.UtcNow;
         foreach (var sess in db.AdminSessions.Where(x => x.UserId == user.Id && x.RevokedAt == null))
             sess.RevokedAt = now;
+        db.AuditLog.Add(new AuditEntry
+        {
+            At = now, AtUnixMs = now.ToUnixTimeMilliseconds(), UserId = user.Id, Username = "console-serveur",
+            Action = "auth.reset-admin", TargetType = "users", TargetId = user.Id.ToString(), Details = username,
+        });
         db.SaveChanges();
 
         Console.WriteLine($"Compte admin « {username} » prêt.");
@@ -287,6 +373,12 @@ public static class AuthEndpoints
         Console.WriteLine("Change-le dès la première connexion (Mon compte).");
         return 0;
     }
+
+    private static AdminPrincipal Principal(AdminUser u) =>
+        new(u.Id, u.Username, u.DisplayName, u.Role, "session", null);
+
+    private static string Clip(string? s) =>
+        AuthService.NormalizeUsername(s) is var n && n.Length > 64 ? n[..64] : AuthService.NormalizeUsername(s);
 
     private static object UserDto(AdminUser x) => new { x.Id, x.Username, x.DisplayName, x.Role, x.IsDisabled };
 
@@ -302,4 +394,5 @@ public static class AuthEndpoints
     public record UpdateUserDto(string? DisplayName, AdminRole? Role, bool? IsDisabled, bool? Unlock);
     public record SetPasswordDto(string? Password);
     public record SettingsDto(bool? LegacyKeyEnabled);
+    public record CreateTokenDto(string? Name, int? ExpiresInDays);
 }

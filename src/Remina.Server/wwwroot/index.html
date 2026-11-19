@@ -115,6 +115,7 @@
       <a data-v="recap" onclick="nav('recap')"><span class="i">🧾</span> Récap</a>
       <a data-v="codes" onclick="nav('codes')"><span class="i">⚷</span> Codes</a>
       <a data-v="accounts" class="adm" onclick="nav('accounts')"><span class="i">☺</span> Comptes</a>
+      <a data-v="audit" class="adm" onclick="nav('audit')"><span class="i">☰</span> Journal</a>
     </nav>
     <div class="foot">
       <div class="me"><b id="meName">—</b><span id="meRole"></span></div>
@@ -214,6 +215,21 @@
         <tbody id="codesBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody></table>
       </div>
     </section>
+    <!-- AUDIT -->
+    <section id="v-audit" class="hide">
+      <div class="card">
+        <div class="row" style="margin-bottom:10px">
+          <input id="auUser" placeholder="Utilisateur"><input id="auAction" placeholder="Action (ex : commands, login)">
+          <span class="muted">Du</span><input id="auFrom" type="date"><span class="muted">au</span><input id="auTo" type="date">
+          <label class="muted" style="display:flex;gap:6px;align-items:center"><input id="auFailed" type="checkbox" style="width:auto"> échecs seulement</label>
+          <button class="sec" onclick="loadAudit()">Filtrer</button>
+        </div>
+        <table><thead><tr><th>Quand</th><th>Qui</th><th>Action</th><th>Cible</th><th>Détail</th><th>IP</th><th>Résultat</th></tr></thead>
+        <tbody id="auditBody"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody></table>
+        <div class="row" style="margin-top:10px"><button id="auMore" class="sec hide" onclick="loadAudit(true)">Plus ancien…</button><span class="muted" style="font-size:12px">Conservation : purge automatique après la durée réglée sur le serveur (365 j par défaut).</span></div>
+      </div>
+    </section>
+
     <!-- ACCOUNTS -->
     <section id="v-accounts" class="hide">
       <div class="card"><h2>Nouveau compte</h2>
@@ -305,8 +321,75 @@ function openMyAccount(){
     <div class="kv"><span class="muted">Rôle</span><span>${State.me.isAdmin?"Administrateur":"Lecture seule"}</span></div>
     ${State.me.method==="session"?`<h2 style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Changer de mot de passe</h2>
     <div class="row"><input id="pwCur" type="password" placeholder="Actuel" autocomplete="current-password"><input id="pwNew" type="password" placeholder="Nouveau (12 car. min.)" autocomplete="new-password"><input id="pwNew2" type="password" placeholder="Confirmation" autocomplete="new-password"><button onclick="changeMyPassword()">Changer</button></div>
-    <p class="muted" style="font-size:12px">Tes autres sessions ouvertes seront fermées.</p>`:""}`;
+    <p class="muted" style="font-size:12px">Tes autres sessions ouvertes seront fermées.</p>
+    <h2 style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Jetons d'API (scripts)</h2>
+    <p class="muted" style="font-size:12px;margin:0 0 8px">En-tête <code>Authorization: Bearer rmn_…</code>, mêmes droits que ton compte. Remplace la clé historique dans tes scripts.</p>
+    <div class="row"><input id="tkName" placeholder="Nom (ex : script sauvegarde)" style="flex:1"><select id="tkDays"><option value="90">90 jours</option><option value="365">1 an</option><option value="30">30 jours</option><option value="0">Sans expiration</option></select><button onclick="createToken()">Créer</button></div>
+    <div id="tkOut" class="hide" style="margin-top:10px"></div>
+    <table style="margin-top:8px"><thead><tr><th>Nom</th><th>Début</th><th>Dernier usage</th><th>Expire</th><th></th></tr></thead><tbody id="tkBody"></tbody></table>`:""}`;
   $("modal").classList.remove("hide");
+  if(State.me.method==="session")loadTokens();
+}
+async function loadTokens(){
+  try{const list=await api("/api/auth/me/tokens");const d=x=>x?new Date(x).toLocaleDateString('fr-FR'):'—';
+    $("tkBody").innerHTML=list.length?list.map(t=>`<tr><td>${esc(t.name)}</td><td><code>${esc(t.prefix)}…</code></td><td class="muted">${t.lastUsedAt?ago(t.lastUsedAt):'jamais'}</td><td class="muted">${t.expired?'<span class="tag rdp">expiré</span>':d(t.expiresAt)}</td><td><button class="danger" onclick="revokeToken('${t.id}')">Révoquer</button></td></tr>`).join(""):'<tr><td colspan="5" class="muted">Aucun jeton.</td></tr>';
+  }catch(e){toast(e.message,true);}
+}
+async function createToken(){
+  try{const days=parseInt($("tkDays").value);const r=await api("/api/auth/me/tokens",{method:"POST",body:JSON.stringify({name:$("tkName").value.trim(),expiresInDays:days||null})});
+    const o=$("tkOut");o.classList.remove("hide");o.innerHTML=`<div class="banner" style="color:var(--txt)"><span>Copie ce jeton maintenant, il ne sera plus affiché :<br><code style="word-break:break-all;user-select:all">${esc(r.token)}</code></span></div>`;
+    $("tkName").value="";loadTokens();
+  }catch(e){toast(e.message,true);}
+}
+async function revokeToken(id){try{await api("/api/auth/me/tokens/"+id,{method:"DELETE"});toast("Jeton révoqué.");loadTokens();}catch(e){toast(e.message,true);}}
+
+/* AUDIT */
+const AUDIT_LABELS=[
+  [/^auth\.login$/,"Connexion"],[/^auth\.logout$/,"Déconnexion"],[/^auth\.bootstrap$/,"Première configuration"],
+  [/^auth\.password\.change$/,"Changement de mot de passe"],[/^auth\.reset-admin$/,"Réinitialisation (ligne de commande)"],
+  [/^token\.create$/,"Jeton d'API créé"],[/^token\.revoke$/,"Jeton d'API révoqué"],[/^agent\.enroll$/,"Inscription d'un poste"],
+  [/machines\/\{id\}\/commands$/,"Commande envoyée"],[/machines\/\{machineId\}\/deploy$/,"Déploiement sur un poste"],
+  [/bureaus\/\{bureauId\}\/deploy$/,"Déploiement sur un bureau"],[/machines\/\{id\}\/wake$/,"Réveil (WoL)"],
+  [/machines\/\{id\}\/bureau$/,"Rattachement à un bureau"],[/^PATCH .*machines\/\{id\}$/,"Poste renommé"],
+  [/^DELETE .*machines\/\{id\}$/,"Poste supprimé"],[/^POST .*\/bureaus$/,"Bureau créé"],[/^DELETE .*bureaus\/\{id\}$/,"Bureau supprimé"],
+  [/^POST .*enrollment-codes$/,"Code d'inscription créé"],[/enrollment-codes\/\{id\}\/revoke$/,"Code révoqué"],
+  [/^POST .*\/packages$/,"Installeur téléversé"],[/^DELETE .*packages\/\{id\}$/,"Installeur supprimé"],
+  [/^POST .*time-entries$/,"Temps saisi"],[/^DELETE .*time-entries\/\{id\}$/,"Saisie supprimée"],
+  [/^POST .*\/users$/,"Compte créé"],[/^PUT .*users\/\{id\}$/,"Compte modifié"],[/users\/\{id\}\/password$/,"Mot de passe réinitialisé"],
+  [/users\/\{id\}\/revoke-sessions$/,"Sessions fermées"],[/^DELETE .*users\/\{id\}$/,"Compte supprimé"],[/settings$/,"Réglages de sécurité"],
+];
+const CMDLBL={1:"verrouiller",2:"redémarrer",3:"message",4:"ticket",5:"auto-login",6:"installation"};
+function auditLabel(a){for(const[re,l]of AUDIT_LABELS)if(re.test(a))return l;return a;}
+function auditDetail(e){
+  if(!e.details)return"";
+  try{const o=JSON.parse(e.details);if(o&&typeof o==="object"){
+    if(o.type!=null&&CMDLBL[o.type])return CMDLBL[o.type]+(o.payload&&o.payload!=="***"?" · "+o.payload:"");
+    return Object.entries(o).filter(([k,v])=>v!==null&&v!=="").map(([k,v])=>k+" : "+(typeof v==="object"?JSON.stringify(v):v)).join(" · ");}}catch(_){}
+  return e.details;
+}
+let auditNext=null;
+async function loadAudit(more=false){
+  const body=$("auditBody");const qs=new URLSearchParams();
+  if($("auUser").value.trim())qs.set("user",$("auUser").value.trim());
+  if($("auAction").value.trim())qs.set("action",$("auAction").value.trim());
+  if($("auFrom").value)qs.set("from",new Date($("auFrom").value+"T00:00:00").toISOString());
+  if($("auTo").value)qs.set("to",new Date($("auTo").value+"T23:59:59").toISOString());
+  if($("auFailed").checked)qs.set("failedOnly","true");
+  if(more&&auditNext)qs.set("before",auditNext);
+  try{
+    const r=await api("/api/admin/audit?"+qs.toString());
+    const name=id=>{const m=State.machines.find(x=>x.id===id)||State.bureaus.find(x=>x.id===id);return m?esc(m.name):(id?'<small class="muted">'+esc(id.slice(0,8))+'</small>':'');};
+    const rows=r.entries.map(e=>`<tr>
+      <td class="muted" style="white-space:nowrap">${new Date(e.at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'})}</td>
+      <td>${esc(e.username)}</td><td title="${esc(e.action)}">${esc(auditLabel(e.action))}</td>
+      <td>${e.targetType?'<span class="tag">'+esc(e.targetType)+'</span> ':''}${name(e.targetId)}</td>
+      <td class="muted" style="max-width:320px;overflow:hidden;text-overflow:ellipsis">${esc(auditDetail(e))}</td>
+      <td class="muted">${esc(e.ip||'')}</td>
+      <td>${e.success?'<span class="dot on"></span>OK':'<span class="dot off"></span>refusé'+(e.statusCode?` (${e.statusCode})`:'')}</td></tr>`).join("");
+    if(more)body.insertAdjacentHTML("beforeend",rows);
+    else body.innerHTML=rows||'<tr><td colspan="7" class="muted">Aucune entrée.</td></tr>';
+    auditNext=r.next;$("auMore").classList.toggle("hide",!r.next);
+  }catch(e){toast(e.message,true);}
 }
 async function changeMyPassword(){
   if($("pwNew").value!==$("pwNew2").value)return toast("Les mots de passe ne correspondent pas.",true);
@@ -347,12 +430,12 @@ async function revokeSessions(id){try{const r=await api(`/api/admin/users/${id}/
 async function deleteUser(id,name){if(!confirm(`Supprimer le compte « ${name} » ?`))return;try{await api("/api/admin/users/"+id,{method:"DELETE"});toast("Supprimé.");loadAccounts();}catch(e){toast(e.message,true);}}
 async function setLegacy(on){if(on&&!confirm("Réactiver la clé historique ?"))return;try{await api("/api/admin/settings",{method:"PUT",body:JSON.stringify({legacyKeyEnabled:on})});toast(on?"Clé réactivée.":"Clé désactivée.");loadAccounts();}catch(e){toast(e.message,true);}}
 
-const TITLES={dash:"Tableau de bord",machines:"Postes",bureaus:"Bureaux",activity:"Activité",software:"Logiciels",recap:"Récap",codes:"Codes d'inscription",accounts:"Comptes & sécurité"};
+const TITLES={dash:"Tableau de bord",machines:"Postes",bureaus:"Bureaux",activity:"Activité",software:"Logiciels",recap:"Récap",codes:"Codes d'inscription",accounts:"Comptes & sécurité",audit:"Journal d'audit"};
 function nav(v){
   document.querySelectorAll("#side nav a").forEach(a=>a.classList.toggle("active",a.dataset.v===v));
-  if(v==="accounts"&&!(State.me&&State.me.isAdmin))v="dash";
+  if((v==="accounts"||v==="audit")&&!(State.me&&State.me.isAdmin))v="dash";
   document.querySelectorAll("#side nav a").forEach(a=>a.classList.toggle("active",a.dataset.v===v));
-  ["dash","machines","bureaus","activity","software","recap","codes","accounts"].forEach(n=>$("v-"+n).classList.toggle("hide",n!==v));
+  ["dash","machines","bureaus","activity","software","recap","codes","accounts","audit"].forEach(n=>$("v-"+n).classList.toggle("hide",n!==v));
   $("title").textContent=TITLES[v];
   if(v==="dash")loadDash();
   if(v==="activity")fillActivityMachines();
@@ -360,6 +443,7 @@ function nav(v){
   if(v==="recap")initRecap();
   if(v==="codes")loadCodes();
   if(v==="accounts")loadAccounts();
+  if(v==="audit")loadAudit();
 }
 
 /* SOFTWARE */

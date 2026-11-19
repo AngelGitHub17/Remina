@@ -20,6 +20,21 @@ installateurs à une Release ; l'auto-mise à jour s'appuie dessus.
 - `ct/` — scripts Proxmox : `remina.sh` (création LXC), `remina-update.sh` (mise à jour serveur).
 - `.github/workflows/release.yml` — build 4 plateformes + installateurs Windows, Release sur tag.
 
+## Nouveautés v0.2.1 — Journal d'audit & jetons d'API (axe A, itération 2)
+- **Journal d'audit** (table `AuditLog`, colonne entière `AtUnixMs` pour trier/paginer en SQL) :
+  - automatique pour **toute écriture** sur `/api/admin/*` (y compris les refus 403 d'un compte
+    en lecture seule) : qui, action (méthode + route), cible, détail (corps JSON **expurgé** :
+    mots de passe/clés/jetons masqués, charge d'auto-login masquée), IP, code HTTP ;
+  - explicite pour connexions réussies/échouées (identifiant inconnu, mauvais mot de passe,
+    compte verrouillé/désactivé), déconnexion, première configuration, changement de mot de
+    passe, `--reset-admin`, jetons créés/révoqués, inscriptions de postes ;
+  - vue **Journal** dans la console (admin) : filtres utilisateur / action / période / échecs,
+    libellés lisibles, pagination « Plus ancien… » ;
+  - **purge automatique** quotidienne au-delà de `Remina:Audit:RetentionDays` (365 j).
+- **Jetons d'API personnels** (table `ApiTokens`, hachés) : `Authorization: Bearer rmn_…`,
+  droits du compte, expiration au choix, créés/révoqués depuis **Mon compte** (session
+  uniquement : un jeton ne peut pas en créer d'autres). Remplacent la clé historique.
+
 ## Nouveautés v0.2.0 — Comptes & sécurité (axe A, itération 1)
 - **Comptes de console** (table `AdminUsers`) : identifiant, nom, mot de passe haché
   PBKDF2-SHA256 600 000 itérations (rehachage transparent si le coût augmente), rôles
@@ -111,10 +126,6 @@ installateurs à une Release ; l'auto-mise à jour s'appuie dessus.
   pour le serveur) ; ensuite l'auto-update s'enchaîne seul.
 
 ## Axe A — suite prévue
-- **v0.2.1** : journal d'audit (qui / quoi / quand / IP, connexions réussies et échouées,
-  toutes les écritures), vue filtrable dans la console, **purge automatique** (365 j par
-  défaut, réglable) ; **jetons d'API par compte** (remplacent la clé historique pour les
-  scripts, révocables, rôle du compte).
 - **v0.2.2** : connexion **NounoursAccount** (redirection de login + vérification serveur à
   serveur ; création automatique du compte à la 1re connexion ; déconnexion NounoursAccount →
   session Remina coupée). Protocole à caler avec le code PHP de NounoursAccount.
