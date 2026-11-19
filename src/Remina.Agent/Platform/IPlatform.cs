@@ -10,8 +10,14 @@ public interface IPlatform
 {
     OsPlatform Os { get; }
 
-    /// <summary>Identifiant matériel stable (survit aux redémarrages et réinstallations agent).</summary>
+    /// <summary>Identifiant matériel envoyé à l'inscription (puis mémorisé dans l'état local).</summary>
     string GetHardwareId();
+
+    /// <summary>Empreinte du poste, pour vérifier au démarrage que l'identité locale est la sienne.</summary>
+    HardwareFingerprint GetFingerprint();
+
+    /// <summary>Vrai si un identifiant d'agent 0.1.12–0.1.14 correspond à ce poste.</summary>
+    bool MatchesLegacyHardwareId(string hardwareId);
 
     /// <summary>Inventaire de base du poste.</summary>
     MachineInventory CollectInventory(string agentVersion);
@@ -57,4 +63,22 @@ public interface IPlatform
 
     /// <summary>Liste des logiciels installés (nom + version) pour l'inventaire.</summary>
     IReadOnlyList<InventorySoftware> GetInstalledSoftware();
+}
+
+/// <summary>
+/// Empreinte d'un poste : base OS hachée, MAC physiques et nom d'hôte. Deux empreintes
+/// désignent le même poste si la base OS est identique et qu'au moins une MAC physique est
+/// commune (ou, faute de MAC exploitable, si le nom d'hôte est identique). Un clone (même
+/// MachineGuid, autres cartes réseau) est donc bien distingué, sans que l'ordre ou l'état des
+/// cartes au démarrage ne fasse perdre l'inscription.
+/// </summary>
+public sealed record HardwareFingerprint(string OsBaseHash, IReadOnlyList<string> Macs, string Hostname)
+{
+    public bool SameMachineAs(string osBaseHash, IReadOnlyCollection<string> macs, string hostname)
+    {
+        if (!string.Equals(OsBaseHash, osBaseHash, StringComparison.OrdinalIgnoreCase)) return false;
+        if (Macs.Count > 0 && macs.Count > 0)
+            return Macs.Intersect(macs, StringComparer.OrdinalIgnoreCase).Any();
+        return string.Equals(Hostname, hostname, StringComparison.OrdinalIgnoreCase);
+    }
 }

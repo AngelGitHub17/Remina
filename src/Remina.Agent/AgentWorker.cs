@@ -43,17 +43,17 @@ public class AgentWorker : BackgroundService
         if (_state.IsEnrolled)
         {
             // Détecte une identité copiée depuis une autre machine (install clonée / fichier
-            // d'état recopié) : si le matériel ne correspond plus, on repart sur une inscription
+            // d'état recopié) : si le poste ne correspond plus, on repart sur une inscription
             // propre pour obtenir un poste distinct (évite deux postes qui partagent un MachineId).
-            var currentHw = _platform.GetHardwareId();
-            if (!string.IsNullOrEmpty(_state.HardwareId) && !string.IsNullOrEmpty(currentHw)
-                && !string.Equals(_state.HardwareId, currentHw, StringComparison.OrdinalIgnoreCase))
+            // La vérification est tolérante à l'ordre/l'état des cartes réseau au démarrage.
+            if (!IsStateFromThisMachine())
             {
                 _log.LogWarning("Identité provenant d'une autre machine (matériel différent) — nouvelle inscription.");
                 _state = new AgentState { ServerUrl = _serverUrl };
             }
             else
             {
+                RefreshFingerprint();
                 _status.Enrolled = true;
                 _status.MachineName = _state.MachineName;
                 _status.NotifyChanged();
@@ -191,7 +191,12 @@ public class AgentWorker : BackgroundService
             MachineName = resp.MachineName,
             HardwareId = hwId,
             ServerUrl = _serverUrl, // mémorise le serveur effectivement utilisé
+            PrinterName = _state.PrinterName,
         };
+        var fp = _platform.GetFingerprint();
+        _state.OsBaseHash = fp.OsBaseHash;
+        _state.MacAddresses = fp.Macs.ToList();
+        _state.Hostname = fp.Hostname;
         try
         {
             _state.Save();
@@ -207,6 +212,46 @@ public class AgentWorker : BackgroundService
         _status.NotifyChanged();
         _log.LogInformation("Poste inscrit : {Name} ({Id})", resp.MachineName, resp.MachineId);
         return true;
+    }
+
+    /// <summary>L'identité locale appartient-elle à ce poste ?</summary>
+    private bool IsStateFromThisMachine()
+    {
+        try
+        {
+            var fp = _platform.GetFingerprint();
+            if (!string.IsNullOrEmpty(_state.OsBaseHash))
+                return fp.SameMachineAs(_state.OsBaseHash, _state.MacAddresses, _state.Hostname);
+            // État écrit par un agent 0.1.12–0.1.14 (pas encore d'empreinte).
+            if (!string.IsNullOrEmpty(_state.HardwareId))
+                return string.Equals(_state.HardwareId, _platform.GetHardwareId(), StringComparison.OrdinalIgnoreCase)
+                    || _platform.MatchesLegacyHardwareId(_state.HardwareId);
+            return true; // état antérieur à l'identifiant matériel : rien à comparer
+        }
+        catch (Exception ex)
+        {
+            // Dans le doute, on garde l'inscription : la perdre est bien plus coûteux.
+            _log.LogWarning(ex, "Vérification d'identité impossible — identité conservée.");
+            return true;
+        }
+    }
+
+    /// <summary>Met à jour l'empreinte mémorisée (MAC cumulées, bornées) après vérification.</summary>
+    private void RefreshFingerprint()
+    {
+        try
+        {
+            var fp = _platform.GetFingerprint();
+            var macs = fp.Macs.Concat(_state.MacAddresses)
+                .Distinct(StringComparer.OrdinalIgnoreCase).Take(16).ToList();
+            if (_state.OsBaseHash == fp.OsBaseHash && _state.Hostname == fp.Hostname
+                && macs.Count == _state.MacAddresses.Count) return;
+            _state.OsBaseHash = fp.OsBaseHash;
+            _state.MacAddresses = macs;
+            _state.Hostname = fp.Hostname;
+            _state.Save();
+        }
+        catch (Exception ex) { _log.LogWarning(ex, "Impossible de mettre à jour l'empreinte du poste."); }
     }
 
     private async Task TrySelfUpdateAsync(CancellationToken ct)

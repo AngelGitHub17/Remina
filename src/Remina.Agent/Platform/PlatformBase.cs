@@ -33,16 +33,91 @@ public abstract class PlatformBase : IPlatform
     public virtual bool IsUserIdle(TimeSpan threshold) => false;
 
     /// <summary>
-    /// Identifiant matériel unique et stable : combine l'identifiant OS (MachineGuid,
-    /// /etc/machine-id, IOPlatformUUID) avec l'adresse MAC et le nom d'hôte, puis hache.
-    /// Deux machines clonées (même MachineGuid) obtiennent ainsi des identifiants distincts.
+    /// Identifiant matériel envoyé à l'inscription : base OS (MachineGuid, /etc/machine-id,
+    /// IOPlatformUUID) + plus petite adresse MAC physique + nom d'hôte, hachés. Deux machines
+    /// clonées (même MachineGuid) obtiennent des identifiants distincts.
+    /// Il n'est calculé qu'à l'inscription puis mémorisé dans l'état local : au démarrage, la
+    /// correspondance poste/identité est vérifiée par <see cref="GetFingerprint"/>, tolérante
+    /// à l'ordre et à l'état des cartes réseau.
     /// </summary>
-    public string GetHardwareId()
+    public string GetHardwareId() =>
+        HashHex($"{GetOsHardwareBase()}|{GetPhysicalMacs().FirstOrDefault() ?? ""}|{Environment.MachineName}");
+
+    public HardwareFingerprint GetFingerprint() =>
+        new(HashHex(GetOsHardwareBase()), GetPhysicalMacs(), Environment.MachineName);
+
+    /// <summary>
+    /// Vérifie un identifiant produit par les agents 0.1.12–0.1.14, qui hachaient la MAC de la
+    /// première carte « Up » (variable selon l'ordre de démarrage du réseau) : on essaie
+    /// toutes les MAC présentes, ainsi que « aucune MAC ».
+    /// </summary>
+    public bool MatchesLegacyHardwareId(string hardwareId)
     {
-        var raw = $"{GetOsHardwareBase()}|{GetPrimaryMac() ?? ""}|{Environment.MachineName}";
-        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw));
-        return Convert.ToHexString(hash);
+        var osBase = GetOsHardwareBase();
+        var candidates = new List<string> { "" };
+        try
+        {
+            candidates.AddRange(NetworkInterface.GetAllNetworkInterfaces()
+                .Select(n => n.GetPhysicalAddress().ToString())
+                .Where(m => !string.IsNullOrEmpty(m)));
+        }
+        catch { }
+        return candidates.Distinct().Any(mac => string.Equals(
+            HashHex($"{osBase}|{mac}|{Environment.MachineName}"), hardwareId,
+            StringComparison.OrdinalIgnoreCase));
     }
+
+    private static string HashHex(string raw) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(raw)));
+
+    // Interfaces virtuelles/VPN/conteneurs : apparaissent et disparaissent, à ignorer.
+    private static readonly string[] VirtualMarkers =
+    {
+        "virtual", "hyper-v", "vmware", "virtualbox", "vbox", "vpn", "wireguard", "tailscale",
+        "zerotier", "docker", "bluetooth", "wsl", "npcap", "loopback", "tap-", "tap0",
+        "openvpn", "fortinet", "anyconnect", "vethernet", "pseudo",
+    };
+    private static readonly string[] VirtualNamePrefixes =
+    {
+        "veth", "br-", "virbr", "vmnet", "tun", "tap", "wg", "zt", "docker", "lxc", "lxd",
+        "utun", "awdl", "llw", "bridge", "anpi", "gif", "stf", "ap1",
+    };
+
+    /// <summary>
+    /// Adresses MAC des cartes physiques (Ethernet/Wi-Fi), <b>quel que soit leur état</b>
+    /// (une carte pas encore montée au démarrage reste prise en compte), triées.
+    /// Exclut les adresses aléatoires (bit « administrée localement ») et les cartes virtuelles.
+    /// </summary>
+    protected static IReadOnlyList<string> GetPhysicalMacs()
+    {
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.NetworkInterfaceType is NetworkInterfaceType.Ethernet
+                    or NetworkInterfaceType.Wireless80211 or NetworkInterfaceType.GigabitEthernet
+                    or NetworkInterfaceType.FastEthernetT or NetworkInterfaceType.FastEthernetFx
+                    or NetworkInterfaceType.Ethernet3Megabit)
+                .Where(n =>
+                {
+                    var name = n.Name.ToLowerInvariant();
+                    var text = name + " " + (n.Description ?? "").ToLowerInvariant();
+                    return !VirtualMarkers.Any(text.Contains)
+                        && !VirtualNamePrefixes.Any(name.StartsWith);
+                })
+                .Select(n => n.GetPhysicalAddress().ToString().ToUpperInvariant())
+                .Where(IsGlobalMac)
+                .Distinct()
+                .OrderBy(m => m, StringComparer.Ordinal)
+                .ToList();
+        }
+        catch { return Array.Empty<string>(); }
+    }
+
+    private static bool IsGlobalMac(string mac) =>
+        mac.Length == 12 && mac != "000000000000"
+        && byte.TryParse(mac.AsSpan(0, 2), System.Globalization.NumberStyles.HexNumber, null, out var b)
+        && (b & 0x02) == 0;
 
     /// <summary>Identifiant propre à l'OS (surchargé par plateforme).</summary>
     protected abstract string GetOsHardwareBase();

@@ -13,6 +13,10 @@ public class AgentState
     public string AgentToken { get; set; } = "";
     public string MachineName { get; set; } = "";
     public string HardwareId { get; set; } = "";
+    /// <summary>Empreinte du poste (depuis 0.1.15) : base OS hachée, MAC physiques, nom d'hôte.</summary>
+    public string OsBaseHash { get; set; } = "";
+    public List<string> MacAddresses { get; set; } = new();
+    public string Hostname { get; set; } = "";
     /// <summary>URL du serveur retenue à l'inscription (survit à une config qui pointe ailleurs).</summary>
     public string ServerUrl { get; set; } = "";
     /// <summary>Imprimante choisie pour les tickets (mémorisée après le premier choix).</summary>

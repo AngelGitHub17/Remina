@@ -20,6 +20,21 @@ installateurs à une Release ; l'auto-mise à jour s'appuie dessus.
 - `ct/` — scripts Proxmox : `remina.sh` (création LXC), `remina-update.sh` (mise à jour serveur).
 - `.github/workflows/release.yml` — build 4 plateformes + installateurs Windows, Release sur tag.
 
+## Nouveautés v0.1.15
+- **Correctif « poste désinscrit après redémarrage »** (régression v0.1.12) : l'identifiant
+  matériel hachait la MAC de la *première carte « Up »*. Au démarrage, une carte virtuelle
+  (Hyper-V `vEthernet`, VPN…) pouvait être montée avant l'Ethernet/Wi-Fi → identifiant
+  différent → l'agent se croyait cloné, effaçait son identité et bouclait sur une
+  réinscription (code épuisé), sans plus jamais remonter ni s'auto-mettre à jour.
+  - L'identifiant n'est plus recalculé à chaque démarrage : il est figé à l'inscription.
+  - Contrôle d'identité par **empreinte** (base OS + MAC *physiques* quel que soit leur état,
+    hors cartes virtuelles et MAC aléatoires + nom d'hôte) : même poste si même base OS et au
+    moins une MAC commune. Un clone (même MachineGuid, autres cartes) reste bien distingué.
+  - Les états écrits par 0.1.12–0.1.14 sont reconnus (toutes les MAC sont essayées).
+  - **Postes déjà bloqués** : ils ne peuvent pas s'auto-mettre à jour → réinstaller une fois
+    l'agent 0.1.15 par-dessus ; l'état local (conservé) est reconnu et le poste réapparaît
+    sous son ancienne fiche, sans doublon.
+
 ## Nouveautés v0.1.14
 - **Correctif `make-dmg.sh`** : la récupération du point de montage via `awk` était cassée
   (regex invalide après interpolation du chemin) → `illegal primary in regular expression`.
@@ -70,6 +85,8 @@ installateurs à une Release ; l'auto-mise à jour s'appuie dessus.
 - Auto-login et installations système nécessitent l'agent **service** (LocalSystem/root) ;
   l'agent graphique en session utilisateur peut échouer sur ces actions privilégiées.
 - Derrière un reverse proxy (NPM), activer **WebSockets** pour le temps réel SignalR.
+- Un agent **0.1.12–0.1.14 bloqué en réinscription** (après redémarrage) doit être réinstallé
+  une fois en 0.1.15 (voir ci-dessus).
 - Un agent/serveur sur une version **antérieure au correctif d'auto-update (v0.1.11)** doit
   être mis à jour **manuellement une fois** (réinstaller l'agent, lancer `ct/remina-update.sh`
   pour le serveur) ; ensuite l'auto-update s'enchaîne seul.
